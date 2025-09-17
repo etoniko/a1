@@ -8,7 +8,7 @@
     <meta name="keywords" content="агарио">
     <meta name="robots" content="index, follow"> <!-- Разрешаем индексацию и переход по ссылкам -->
     <link rel="canonical" href="https://агарио.рф/"> <!-- Указываем канонический URL -->
-    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="https://agar.su/icon.svg" type="image/x-icon">
     <meta name="yandex-verification" content="d2648e3bc2d73129" />
 <!-- Yandex.Metrika counter -->
 <script type="text/javascript" >
@@ -26,55 +26,29 @@
 </script>
 <noscript><div><img src="" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
 <!-- /Yandex.Metrika counter -->
-    <style>
-        body {
-            font-family: sans-serif;
-            text-align: center;
-            padding: 50px;
-        }
-        h1 {
-            color: #333;
-        }
-        p {
-            color: #666;
-            line-height: 1.6;
-        }
-        a {
-            color: #007bff;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        .play-button {
-            display: inline-block;
-            padding: 15px 30px;
-            font-size: 20px;
-            font-weight: bold;
-            text-decoration: none;
-            background-color: #016bef;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        .play-button:hover {
-            background-color: #0052cc; /* Более темный оттенок при наведении */
-        }
-    </style>
+<style>
+body{font-family:Inter,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0b1220;color:#e6eef8}
+.card{max-width:720px;padding:28px;border-radius:12px;background:rgba(255,255,255,0.03);box-shadow:0 6px 30px rgba(0,0,0,0.4);text-align:center}
+a{color:inherit;text-decoration:underline}
+img.icon{width:84px;height:84px;margin-bottom:12px}
+</style>
 </head>
 <body>
-    <h1>Играйте в Агарио Онлайн Бесплатно на агарио.рф</h1>
-    <p>Добро пожаловать на агарио.рф – лучший сайт для игры в <b>Агарио</b> прямо в вашем браузере!  Не нужно ничего скачивать или устанавливать – просто начните играть в <b>Агарио онлайн</b> прямо сейчас и покорите таблицу лидеров!</p>
-	<a href="https://agar.su/" class="play-button">Играть Сейчас!</a>
-
-    <p><b>Агарио</b> – это захватывающая многопользовательская онлайн-игра, в которой вы управляете клеткой и поглощаете другие клетки, чтобы стать больше.  Станьте самым большим и сильным игроком в <b>Агарио</b>!</p>
-
-
-    <p>Начните играть в <b>Агарио</b> <a href="https://agar.su/">прямо сейчас!</a></p> 
-
-    <p><b>агарио.рф</b> - ваш лучший источник для <b>Агарио</b>. Наслаждайтесь игрой!</p>
+<div class="card">
+<img class="icon" src="https://agar.su/icon.svg" alt="Agar logo" />
+<h1>Agar.su — перенаправление на основной сайт</h1>
+<p>Вы будете перенаправлены на <a href="https://agar.su/">https://agar.su/</a>. Если переадресация не сработала, нажмите ссылку.</p>
+<p style="font-size:0.9em;opacity:0.8">(Переход выполняется в 301/редирект идеале)</p>
+</div>
+<script>
+// JS-редирект: replace чтобы не оставлять в истории
+try{
+// Небольшая задержка чтобы дать время роботам прочитать meta/canonical
+setTimeout(function(){
+// Используем replace; если хотите 301-имитацию, настроьте сервер.
+window.location.replace('https://agar.su/');
+}, 900);
+}catch(e){/* ignore */}
+</script>
 </body>
 </html>
