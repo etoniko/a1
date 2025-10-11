@@ -10,6 +10,7 @@
     <link rel="canonical" href="https://агарио.рф/"> <!-- Указываем канонический URL -->
     <link rel="icon" href="https://agar.su/icon.svg" type="image/x-icon">
     <meta name="yandex-verification" content="d2648e3bc2d73129" />
+    
 <!-- Yandex.Metrika counter -->
 <script type="text/javascript" >
    (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
@@ -26,29 +27,104 @@
 </script>
 <noscript><div><img src="" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
 <!-- /Yandex.Metrika counter -->
-<style>
-body{font-family:Inter,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0b1220;color:#e6eef8}
-.card{max-width:720px;padding:28px;border-radius:12px;background:rgba(255,255,255,0.03);box-shadow:0 6px 30px rgba(0,0,0,0.4);text-align:center}
-a{color:inherit;text-decoration:underline}
-img.icon{width:84px;height:84px;margin-bottom:12px}
-</style>
+    <style>
+        body {
+            font-family: Inter, Arial, Helvetica, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            background: #0b1220;
+            color: #e6eef8;
+            align-items: center;
+        }
+        .ad-top, .ad-bottom {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .ad-top { height: 90px; }
+        .ad-bottom { height: 90px; }
+        .card {
+            max-width: 720px;
+            padding: 28px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.03);
+            box-shadow: 0 6px 30px rgba(0,0,0,0.4);
+            text-align: center;
+            margin: 20px 0;
+        }
+        .play-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 18px 36px;
+            font-size: 1.5em;
+            color: #fff;
+            background: #006cf1;
+            border-radius: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.2s;
+        }
+        .play-button:hover {
+            transform: scale(1.05);
+        }
+        img.icon {
+            width: 84px;
+            height: 84px;
+            margin-bottom: 12px;
+        }
+    </style>
 </head>
 <body>
+<!-- Реклама сверху -->
+<div class="ad-top" id="ya-top-ad"></div>
+
 <div class="card">
-<img class="icon" src="https://agar.su/icon.svg" alt="Agar logo" />
-<h1>Agar.su — перенаправление на основной сайт</h1>
-<p>Вы будете перенаправлены на <a href="https://agar.su/">https://agar.su/</a>. Если переадресация не сработала, нажмите ссылку.</p>
-<p style="font-size:0.9em;opacity:0.8">(Переход выполняется в 301/редирект идеале)</p>
+    <img class="icon" src="https://agar.su/icon.svg" alt="Agar logo" />
+    <h1>Agar.su — Начать играть</h1>
+    <p>Нажмите кнопку ниже, чтобы перейти на основной сайт и начать игру</p>
+    <a href="https://agar.su/" class="play-button">Играть</a>
 </div>
+
+<!-- Реклама снизу -->
+<div class="ad-bottom" id="ya-floor-ad"></div>
+
+<!-- Yandex.RTB -->
+<script>window.yaContextCb=window.yaContextCb||[]</script>
+<script src="https://yandex.ru/ads/system/context.js" async></script>
+
+<!-- Top Ad -->
 <script>
-// JS-редирект: replace чтобы не оставлять в истории
-try{
-// Небольшая задержка чтобы дать время роботам прочитать meta/canonical
-setTimeout(function(){
-// Используем replace; если хотите 301-имитацию, настроьте сервер.
-window.location.replace('https://agar.su/');
-}, 900);
-}catch(e){/* ignore */}
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-3",
+        "type": "topAd",
+        "elementId": "ya-top-ad"
+    });
+});
+</script>
+
+<!-- Floor Ads (Desktop + Touch) -->
+<script>
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-1",
+        "type": "floorAd",
+        "platform": "desktop",
+        "elementId": "ya-floor-ad"
+    });
+});
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-2",
+        "type": "floorAd",
+        "platform": "touch",
+        "elementId": "ya-floor-ad"
+    });
+});
 </script>
 </body>
 </html>
+
