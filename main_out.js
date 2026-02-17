@@ -440,8 +440,7 @@ if (!document.hidden) {
 	setTimeout(() => { this.sendChat("вошёл в игру!"); }, 1000); 
     }
     onWsClose() {
-        setTimeout(this.showConnecting.bind(this), this.delay);
-        this.delay *= 1.5;
+console.log("WebSocket closed");
     }
     onWsMessage(msg) {
         this.handleWsMessage(new DataView(msg.data));
