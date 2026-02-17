@@ -986,6 +986,10 @@ if (this.ping > 0) {
         });
         if (this.ua && this.playerCells.length === 0) {
             this.showOverlays(false);
+			    // показать рекламу после смерти
+    if (typeof showYandexFullscreenAd === "function") {
+        showYandexFullscreenAd();
+           }
         }
     }
     onUpdateXp(xp) {
