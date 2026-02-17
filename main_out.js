@@ -1,7 +1,7 @@
 class Game {
     constructor() {
         // Соединение
-        this.CONNECTION_URL = "ffa.agar.su:6001";
+        this.CONNECTION_URL = "";
         this.currentWebSocketUrl = null;
         this.ws = null;
         this.Delay = 500;
@@ -40,11 +40,15 @@ class Game {
         this.scoreText = null;
         this.userScore = 0;
         this.userNickName = null;
+		this.skinMap = {};     // nick -> codeid
+        this.skinCache = {};   // codeid -> Image
+        this.skinLoading = {}; // чтобы не грузить 100 раз
         this.hideChat = false;
         this.showDarkTheme = false;
         this.showName = true;
         this.showSkin = true;
         this.showMass = true;
+		this.interpSpeed = 120; // скорость интерполяции (по умолчанию середина)
         this.noRanking = false;
         // Мышь и ввод
         this.rawMouseX = 0;
@@ -85,7 +89,82 @@ class Game {
         window.setDarkTheme = (arg) => { this.showDarkTheme = arg; };
         window.setShowMass = (arg) => { this.showMass = arg; };
         window.setChatHide = (arg) => { this.hideChat = arg; };
+		window.setSpeedStage = (stage) => {
+    stage = parseInt(stage);
+
+    let speed = 120;
+    let label = "Normal";
+
+    if (stage === 1) {
+        speed = 240;
+        label = "Slow";
     }
+    if (stage === 2) {
+        speed = 120;
+        label = "Normal";
+    }
+    if (stage === 3) {
+        speed = 60;
+        label = "Fast";
+    }
+
+    game.interpSpeed = speed;
+    document.getElementById("speedLabel").innerText = stage + " (" + label + ")";
+};
+
+    }
+	
+	
+	async loadSkinList() {
+    try {
+        const res = await fetch("https://api.agar.su/skinlist.txt");
+        const text = await res.text();
+
+        text.split("\n").forEach(line => {
+            line = line.trim();
+            if (!line) return;
+
+            const [nick, code] = line.split(":");
+            if (!nick || !code) return;
+
+            this.skinMap[nick.toLowerCase()] = code.trim();
+        });
+
+        console.log("Skin list loaded:", Object.keys(this.skinMap).length);
+    } catch (e) {
+        console.error("Skin list load error", e);
+    }
+}
+
+getSkinForNick(nick) {
+    if (!nick) return null;
+
+    const code = this.skinMap[nick.toLowerCase()];
+    if (!code) return null;
+
+    // уже загружен
+    if (this.skinCache[code]) return this.skinCache[code];
+
+    // уже грузится
+    if (this.skinLoading[code]) return null;
+
+    // начинаем загрузку
+    const img = new Image();
+    img.src = "https://api.agar.su/skins/" + code + ".png";
+
+    this.skinLoading[code] = true;
+
+    img.onload = () => {
+        this.skinCache[code] = img;
+        delete this.skinLoading[code];
+    };
+
+    img.onerror = () => {
+        delete this.skinLoading[code];
+    };
+
+    return null;
+}
     getXp(level) {
         return ~~(100 * (level ** 2 / 2));
     }
@@ -159,6 +238,7 @@ class Game {
         let chattxt;
         this.mainCanvas = this.nCanvas = document.getElementById("canvas");
         this.ctx = this.mainCanvas.getContext("2d");
+		this.loadSkinList();
         this.mainCanvas.onmousemove = (event) => {
             this.rawMouseX = event.clientX;
             this.rawMouseY = event.clientY;
@@ -254,6 +334,10 @@ class Game {
         setInterval(this.sendMouseMove.bind(this), 40);
         setTimeout(this.showCaptcha.bind(this), 100);
         document.querySelector("#overlays").style = "display:block;";
+		const select = document.getElementById("gamemode");
+if (select && select.value) {
+    this.CONNECTION_URL = select.value;
+}
     }
     handleWheel(event) {
         this.zoom *= Math.pow(.9, event.wheelDelta / -120 || event.detail || 0);
@@ -1059,7 +1143,7 @@ class Cell {
     }
     updatePos() {
         if (this.id === 0) return 1;
-        const progress = Math.min(1, Math.max(0, (game.timestamp - this.updateTime) / 120));
+        const progress = Math.min(1, Math.max(0, (game.timestamp - this.updateTime) / game.interpSpeed));
         if (this.destroyed && progress >= 1) {
             const i = game.Cells.indexOf(this);
             if (i !== -1) game.Cells.splice(i, 1);
@@ -1096,10 +1180,36 @@ class Cell {
 this.updatePos();
 		let renderSize = this.size;
 if (renderSize === 0) renderSize = 20;
-        ctx.fillStyle = this.color;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, renderSize, 0, 2 * Math.PI);
-        ctx.fill();
+ctx.arc(this.x, this.y, renderSize, 0, 2 * Math.PI);
+ctx.closePath();
+
+// ===== SKIN =====
+let skinImg = null;
+if (game.showSkin && this.name) {
+    skinImg = game.getSkinForNick(this.name);
+}
+
+if (skinImg) {
+    // клип кругом
+    ctx.save();
+    ctx.clip();
+
+    ctx.drawImage(
+        skinImg,
+        this.x - renderSize,
+        this.y - renderSize,
+        renderSize * 2,
+        renderSize * 2
+    );
+
+    ctx.restore();
+} else {
+    // обычный цвет если скина нет
+    ctx.fillStyle = this.color;
+    ctx.fill();
+}
+
         const isPlayer = game.playerCells.includes(this);
         if (this.id !== 0) {
             const x = ~~this.x;
