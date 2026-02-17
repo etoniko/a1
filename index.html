@@ -33,51 +33,46 @@
 	<!-- Yandex.RTB -->
 <script>window.yaContextCb=window.yaContextCb||[]</script>
 <script src="https://yandex.ru/ads/system/context.js" async></script>
-<!-- Yandex.RTB R-A-17463228-4 -->
 <script>
 window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-4",
-        "type": "fullscreen",
-        "platform": "touch"
-    })
-})
-</script>
-<!-- Top Ad -->
-<script>
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-3",
-        "type": "topAd",
-        "elementId": "ya-top-ad"
-    });
-});
-</script>
 
-<!-- Floor Ads (Desktop + Touch) -->
-<script>
-window.yaContextCb.push(() => {
+    // левый 300x600
     Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-1",
-        "type": "floorAd",
-        "platform": "desktop",
-        "elementId": "ya-floor-ad"
+        blockId: "R-A-17463228-6",
+        renderTo: "yandex_rtb_R-A-17463228-6"
     });
-});
-window.yaContextCb.push(() => {
+
+    // правый 300x600
     Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-2",
-        "type": "floorAd",
-        "platform": "touch",
-        "elementId": "ya-floor-ad"
+        blockId: "R-A-17463228-7",
+        renderTo: "yandex_rtb_R-A-17463228-7"
     });
+
+    // верх 970x250
+    Ya.Context.AdvManager.render({
+        blockId: "R-A-17463228-8",
+        renderTo: "yandex_rtb_R-A-17463228-8"
+    });
+
+    // низ 970x250
+    Ya.Context.AdvManager.render({
+        blockId: "R-A-17463228-9",
+        renderTo: "yandex_rtb_R-A-17463228-9"
+    });
+
 });
 </script>
 </head>
 
 <body>
     <div id="overlays">
-		<div id="ya-top-ad"></div>
+    <!-- Боковые -->
+    <div id="ad1"><div id="yandex_rtb_R-A-17463228-6"></div></div>
+    <div id="ad2"><div id="yandex_rtb_R-A-17463228-7"></div></div>
+    <!-- Верх -->
+    <div id="adTop"><div id="yandex_rtb_R-A-17463228-8"></div></div>
+    <!-- Низ -->
+    <div id="adBottom"><div id="yandex_rtb_R-A-17463228-9"></div></div>
         <div id="helloDialog">
                 <div class="form-group">
                     <h2 id="title" data-en="Matheus Valadares 👋🏿">Матеус Валадарес 👋🏻</h2>
@@ -184,7 +179,6 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
             </div>
 <footer id="footer"><a target="_blank" href="https://agar.su/privacy.html" data-en="privacy">политика</a><a target="_blank" href="https://agar.su/rules.html" data-en="rules"> · правила · </a><a target="_blank" href="https://agar.su/offer.html" data-en="offer">оферта</a></footer>
         </div>
-		<div id="ya-floor-ad"></div>
     </div>
 
     <div id="connecting">
@@ -219,6 +213,7 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
 </script>
 </body>
 </html>
+
 
 
 
