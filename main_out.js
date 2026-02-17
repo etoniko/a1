@@ -16,8 +16,8 @@
     <link id="favicon" rel="icon" type="image/png" href="ico.png" />
     <link href='https://fonts.googleapis.com/css?family=Ubuntu:700' rel='stylesheet' type='text/css'>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
-    <link href="./index.css" rel="stylesheet">
-    <script src="./main_out.js?1"></script> 
+    <link href="index.css" rel="stylesheet">
+    <script src="main_out.js?1"></script> 
 </head>
 
 <body>
