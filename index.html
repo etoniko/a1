@@ -1,143 +1,142 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agar.io - Русское Агарио</title>
+     <title>Agar.io - Русское Агарио</title>
     <meta name="description" content="Агарио - шарики онлайн, лучшая Агарио игра в браузере. Никаких скачиваний, просто начните играть в Агарио прямо сейчас!">
-    <meta name="keywords" content="агарио">
-    <meta name="robots" content="index, follow"> <!-- Разрешаем индексацию и переход по ссылкам -->
-    <link rel="canonical" href="https://агарио.рф/"> <!-- Указываем канонический URL -->
-    <link rel="icon" href="ico.png">
+	<meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="keywords" content="агарио, agario, agar, io, cell, cells, virus, bacteria, blob, game, games, web game, html5, fun, flash">
+    <meta name="robots" content="index, follow">
+    <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="yandex-verification" content="d2648e3bc2d73129" />
-    
-<!-- Yandex.Metrika counter -->
-<script type="text/javascript" >
-   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-   m[i].l=1*new Date();
-   for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
-   k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
-   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
-
-   ym(103054313, "init", {
-        clickmap:true,
-        trackLinks:true,
-        accurateTrackBounce:true
-   });
-</script>
-<noscript><div><img src="" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
-<!-- /Yandex.Metrika counter -->
-    <style>
-        body {
-            font-family: Inter, Arial, Helvetica, sans-serif;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            margin: 0;
-            background: #0b1220;
-            color: #e6eef8;
-            align-items: center;
-        }
-        .ad-top, .ad-bottom {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .ad-top { height: 90px; }
-        .ad-bottom { height: 90px; }
-        .card {
-            max-width: 720px;
-            padding: 28px;
-            border-radius: 12px;
-            background: rgba(255,255,255,0.03);
-            box-shadow: 0 6px 30px rgba(0,0,0,0.4);
-            text-align: center;
-            margin: 20px 0;
-        }
-        .play-button {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 18px 36px;
-            font-size: 1.5em;
-            color: #fff;
-            background: #006cf1;
-            border-radius: 12px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: transform 0.2s;
-        }
-        .play-button:hover {
-            transform: scale(1.05);
-        }
-        img.icon {
-            width: 84px;
-            height: 84px;
-            margin-bottom: 12px;
-        }
-    </style>
+	
+    <link id="favicon" rel="icon" type="image/png" href="ico.png" />
+    <link href='https://fonts.googleapis.com/css?family=Ubuntu:700' rel='stylesheet' type='text/css'>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
+    <link href="./index.css" rel="stylesheet">
+    <script src="./main_out.js"></script> 
 </head>
+
 <body>
-<!-- Реклама сверху -->
-<div class="ad-top" id="ya-top-ad"></div>
+    <div id="overlays">
+        <div id="helloDialog">
+                <div class="form-group">
+                    <h2 id="title" data-en="Matheus Valadares 👋🏿">Матеус Валадарес 👋🏻</h2>
+                </div>
 
-<div class="card">
-    <img class="icon" src="https://agar.su/icon.svg" alt="Agar logo" />
-    <h1>Agar.su — Начать играть</h1>
-    <p>Нажмите кнопку ниже, чтобы перейти на основной сайт и начать игру</p>
-    <a href="https://agar.su/" class="play-button">Играть</a>
+                <div class="form-group">
+                    <input id="nick" class="form-control save" placeholder="Ник" data-en-placeholder="Nick" maxlength="16"/>
+                    <select id="gamemode" class="form-control" onchange="setServer($(this).val());" required>
+                        <option value="ffa.agar.su:6001">FFA - 𝙈𝙤𝙨𝙘𝙤𝙬</option>
+						<option value="ffa.agar.su:6008">FFA - 𝐒𝐨𝐥𝐨</option>
+						<option value="ffa.agar.su:6002">MegaSplit5k1</option>
+						<option value="ffa.agar.su:6003">Experemental</option>
+						<option value="ffa.agar.su:6004">pvp1</option>
+						<option value="ffa.agar.su:6005">pvp2</option>
+						<option value="ffa.agar.su:6006">Tournament</option>
+                    </select>
+                    <br clear="both" />
+                </div>
+
+                <div class="form-group">
+
+                    <button type="submit" id="play-btn" onclick="setNick(document.getElementById('nick').value); return false;" class="btn btn-play btn-primary btn-needs-server" data-en="Play">Играть</button>
+                    <button onclick="
+    var s = document.getElementById('settings');
+    var i = document.getElementById('instructions');
+    if (s.style.display === 'none' || s.style.display === '') {
+        s.style.display = 'block';
+        i.style.display = 'none';
+    } else {
+        s.style.display = 'none';
+        i.style.display = 'block';
+    }"
+    class="btn btn-info btn-settings" 
+    id="settings-btn">
+    <i class="glyphicon glyphicon-cog"></i>
+</button>
+                    <br clear="both" />
+                </div>
+
+                <div id="settings" class="checkbox" style="display:none;">
+                    <div class="form-group" id="mainform">
+<button type="button" id="spectate-btn" onclick="setSpect(); return false;" style="width: 100%" class="btn btn-warning btn-spectate btn-needs-server" data-en="Spectate">Наблюдение</button>
+                        <br clear="both" />
+                    </div>
+<div style="margin: 6px;">
+    <label>
+        <input type="checkbox" class="save" data-box-id="1" onchange="setSkins(this.checked);" data-en="No skins">Без скинов
+    </label>
+    <label>
+        <input type="checkbox" class="save" data-box-id="2" onchange="setNames(!this.checked);" data-en="No names">Без ников
+    </label>
+    <label>
+        <input type="checkbox" class="save" data-box-id="3" onchange="setDarkTheme(this.checked);" data-en="Dark Theme">Тёмная тема
+    </label>
+    <label>
+        <input type="checkbox" class="save" data-box-id="4" onchange="setColors(this.checked);" data-en="No colors">Без цветов
+    </label>
+    <label>
+        <input type="checkbox" class="save" data-box-id="5" onchange="setShowMass(this.checked);" data-en="Show mass" checked>Показывать массу
+    </label>
+    <label>
+        <input type="checkbox" class="save" data-box-id="7" onchange="setChatHide(this.checked);" data-en="Close chat">Закрыть чат
+    </label>
 </div>
+                </div>
 
-<!-- Реклама снизу -->
-<div class="ad-bottom" id="ya-floor-ad"></div>
+            <div id="instructions">
+                <hr/>
+                <center>
+<span class="text-muted"
+data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>Press <b>W</b> to eject mass">
+Двигайте мышь чтобы управлять клеткой<br>
+Нажмите <b>Space</b> чтобы разделиться<br>
+Нажмите <b>W</b> чтобы выбросить массу
+</span>
+                </center>
+            </div>
 
-<!-- Yandex.RTB -->
-<script>window.yaContextCb=window.yaContextCb||[]</script>
-<script src="https://yandex.ru/ads/system/context.js" async></script>
-<!-- Yandex.RTB R-A-17463228-4 -->
-<script>
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-4",
-        "type": "fullscreen",
-        "platform": "touch"
-    })
-})
-</script>
-<!-- Top Ad -->
-<script>
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-3",
-        "type": "topAd",
-        "elementId": "ya-top-ad"
-    });
-});
-</script>
+            <hr />
+            <div id="footer">
+                <a href="https://t.me/agarsu" class="text-muted">Telegram: @agarsu</a>
+            </div>
 
-<!-- Floor Ads (Desktop + Touch) -->
-<script>
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-1",
-        "type": "floorAd",
-        "platform": "desktop",
-        "elementId": "ya-floor-ad"
+        </div>
+    </div>
+
+    <div id="connecting">
+        <div style="width: 350px; background-color: #FFFFFF; margin: 100px auto; border-radius: 15px; padding: 5px 15px 5px 15px;">
+<h2 data-en="Connecting">Подключение</h2>
+<p data-en="If you cannot connect to servers, send message telegram">Если не удаётся подключиться к серверу — напшии в телеграмм</p>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+    <input type="text" id="chat_textbox" placeholder="Нажмите Enter для чата" data-en-placeholder="Press Enter to chat" maxlength="200"/>
+	<script>
+(function () {
+
+    var lang = (navigator.language || navigator.userLanguage || "en").toLowerCase();
+    var isEnglish = !lang.startsWith("ru");
+    if (!isEnglish) return;
+
+    document.querySelectorAll("[data-en]").forEach(el=>{
+        el.innerHTML = el.getAttribute("data-en");
     });
-});
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-2",
-        "type": "floorAd",
-        "platform": "touch",
-        "elementId": "ya-floor-ad"
+
+    document.querySelectorAll("[data-en-placeholder]").forEach(el=>{
+        el.placeholder = el.getAttribute("data-en-placeholder");
     });
-});
+
+    document.querySelectorAll("[data-en-content]").forEach(el=>{
+        el.setAttribute("content", el.getAttribute("data-en-content"));
+    });
+
+})();
 </script>
 </body>
 </html>
-
-
-
-
-
