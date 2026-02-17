@@ -1225,6 +1225,10 @@ if (renderSize === 0) renderSize = 20;
 ctx.arc(this.x, this.y, renderSize, 0, 2 * Math.PI);
 ctx.closePath();
 
+// ВСЕГДА сначала красим клетку цветом
+ctx.fillStyle = this.color;
+ctx.fill();
+
 // ===== SKIN =====
 let skinImg = null;
 if (game.showSkin && this.name) {
@@ -1232,10 +1236,10 @@ if (game.showSkin && this.name) {
 }
 
 if (skinImg) {
-    // клип кругом
     ctx.save();
-    ctx.clip();
+    ctx.clip(); // клип по кругу
 
+    // СКИН БЕЗ ПРОЗРАЧНОСТИ
     ctx.drawImage(
         skinImg,
         this.x - renderSize,
@@ -1245,11 +1249,8 @@ if (skinImg) {
     );
 
     ctx.restore();
-} else {
-    // обычный цвет если скина нет
-    ctx.fillStyle = this.color;
-    ctx.fill();
 }
+
 
         const isPlayer = game.playerCells.includes(this);
         if (this.id !== 0) {
