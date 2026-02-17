@@ -114,21 +114,46 @@ class Game {
 
     }
 	
+	normalizeNick(nick) {
+    if (!nick) return '';
+
+    let n = nick.trim();
+
+    // Проверяем, начинается ли ник с открывающейся скобки
+    if (n.startsWith('[')) {
+        const endIndex = n.indexOf(']');
+        if (endIndex === -1) return ''; // закрывающей скобки нет
+
+        const innerNick = n.substring(1, endIndex).trim();
+        if (!innerNick || innerNick !== n.substring(1, endIndex)) return ''; // проверка пробелов внутри
+
+        // Возвращаем ник вместе со скобками, игнорируя всё после закрывающейся скобки
+        return `[${innerNick}]`.toLowerCase();
+    } else {
+        // Ник без скобок: нельзя содержать пробелы в начале/конце
+        if (!n || n.trim() !== n) return '';
+        return n.toLowerCase();
+    }
+}
 	
 	async loadSkinList() {
     try {
         const res = await fetch("https://api.agar.su/skinlist.txt");
         const text = await res.text();
 
-        text.split("\n").forEach(line => {
-            line = line.trim();
-            if (!line) return;
+text.split("\n").forEach(line => {
+    line = line.trim();
+    if (!line) return;
 
-            const [nick, code] = line.split(":");
-            if (!nick || !code) return;
+    const [nick, code] = line.split(":");
+    if (!nick || !code) return;
 
-            this.skinMap[nick.toLowerCase()] = code.trim();
-        });
+    const normalized = this.normalizeNick(nick);
+    if (!normalized) return;
+
+    this.skinMap[normalized] = code.trim();
+});
+
 
         console.log("Skin list loaded:", Object.keys(this.skinMap).length);
     } catch (e) {
@@ -139,16 +164,15 @@ class Game {
 getSkinForNick(nick) {
     if (!nick) return null;
 
-    const code = this.skinMap[nick.toLowerCase()];
+    const normalized = normalizeNick(nick);
+    if (!normalized) return null;
+
+    const code = this.skinMap[normalized];
     if (!code) return null;
 
-    // уже загружен
     if (this.skinCache[code]) return this.skinCache[code];
-
-    // уже грузится
     if (this.skinLoading[code]) return null;
 
-    // начинаем загрузку
     const img = new Image();
     img.src = "https://api.agar.su/skins/" + code + ".png";
 
@@ -165,6 +189,7 @@ getSkinForNick(nick) {
 
     return null;
 }
+
     getXp(level) {
         return ~~(100 * (level ** 2 / 2));
     }
