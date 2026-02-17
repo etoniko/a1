@@ -370,30 +370,42 @@ if (select && select.value) {
             this.disableCaptcha();
         }
     }
-    wsConnect(undefined, token) {
-        if (this.ws) {
-            this.ws.onopen = null;
-            this.ws.onmessage = null;
-            this.ws.onclose = null;
-            try {
-                this.ws.close();
-            } catch (b) {}
-            this.ws = null;
-        }
-        const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
-        this.playerCells = [];
-        this.nodes = {};
-        this.nodelist = [];
-        this.Cells = [];
-        this.leaderBoard = [];
-        console.info("Connecting to " + wsUrl + "..");
-        const params = `?token=${encodeURIComponent(token)}&accountToken=${encodeURIComponent(localStorage.accountToken)}`;
-        this.ws = new WebSocket(wsUrl + params, "eSejeKSVdysQvZs0ES1H");
-        this.ws.binaryType = "arraybuffer";
-        this.ws.onopen = this.onWsOpen.bind(this);
-        this.ws.onmessage = this.onWsMessage.bind(this);
-        this.ws.onclose = this.onWsClose.bind(this);
+wsConnect(token) {
+    if (this.ws) {
+        this.ws.onopen = null;
+        this.ws.onmessage = null;
+        this.ws.onclose = null;
+        try { this.ws.close(); } catch (b) {}
+        this.ws = null;
     }
+
+    const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
+
+    this.playerCells = [];
+    this.nodes = {};
+    this.nodelist = [];
+    this.Cells = [];
+    this.leaderBoard = [];
+
+    console.info("Connecting to " + wsUrl + "..");
+
+    const captchaToken = token || "";
+    const accountToken = localStorage.getItem("accountToken") || "";
+
+    console.log("captchaToken:", captchaToken);
+    console.log("accountToken:", accountToken);
+    console.log("origin:", location.origin);
+
+    const params =
+        `?token=${encodeURIComponent(captchaToken)}&accountToken=${encodeURIComponent(accountToken)}`;
+
+    this.ws = new WebSocket(wsUrl + params, "eSejeKSVdysQvZs0ES1H");
+    this.ws.binaryType = "arraybuffer";
+    this.ws.onopen = this.onWsOpen.bind(this);
+    this.ws.onmessage = this.onWsMessage.bind(this);
+    this.ws.onclose = this.onWsClose.bind(this);
+}
+
     prepareData(a) {
         return new DataView(new ArrayBuffer(a));
     }
