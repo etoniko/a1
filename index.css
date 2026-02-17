@@ -19,6 +19,67 @@ body {
     rgba(0,0,0,0.5); 
     z-index: 200;
 }
+/* ===== БОКОВЫЕ БАННЕРЫ 300x600 ===== */
+#ad1, #ad2 {
+    width: 300px;
+    height: 600px;
+    background: #fff;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 0 25px rgba(0,0,0,0.15);
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+}
+
+#ad1 { left: 20px; }
+#ad2 { right: 20px; }
+
+
+/* ===== ВЕРХНИЙ БАННЕР 970x250 ===== */
+#adTop {
+    width: 970px;
+    height: 250px;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.15);
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9;
+}
+
+
+/* ===== НИЖНИЙ БАННЕР 970x250 ===== */
+#adBottom {
+    width: 970px;
+    height: 250px;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.15);
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9;
+}
+
+
+/* ===== СКРЫТИЕ НА МАЛЕНЬКИХ ЭКРАНАХ ===== */
+@media (max-width: 1600px) {
+    #ad1, #ad2 {
+        display: none;
+    }
+}
+
+@media (max-width: 1000px) {
+    #adTop, #adBottom {
+        display: none;
+    }
+}
+
 
 #title {
     padding: 10px;
