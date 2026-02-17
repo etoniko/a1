@@ -164,7 +164,7 @@ text.split("\n").forEach(line => {
 getSkinForNick(nick) {
     if (!nick) return null;
 
-    const normalized = normalizeNick(nick);
+    const normalized = this.normalizeNick(nick);
     if (!normalized) return null;
 
     const code = this.skinMap[normalized];
