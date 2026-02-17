@@ -1,6 +1,6 @@
 <html>
 <head>
-     <title>Agar.io - Русское Агарио</title>
+     <title>Agar.io</title>
     <meta name="description" content="Агарио - шарики онлайн, лучшая Агарио игра в браузере. Никаких скачиваний, просто начните играть в Агарио прямо сейчас!">
 	<meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -16,9 +16,67 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
     <link href="./index.css" rel="stylesheet">
     <script src="./main_out.js?7"></script> 
+	<!-- Yandex.Metrika counter -->
+<script type="text/javascript" >
+   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+   m[i].l=1*new Date();
+   for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+   k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+   ym(103054313, "init", {
+        clickmap:true,
+        trackLinks:true,
+        accurateTrackBounce:true
+   });
+</script>
+	<!-- Yandex.RTB -->
+<script>window.yaContextCb=window.yaContextCb||[]</script>
+<script src="https://yandex.ru/ads/system/context.js" async></script>
+<!-- Yandex.RTB R-A-17463228-4 -->
+<script>
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-4",
+        "type": "fullscreen",
+        "platform": "touch"
+    })
+})
+</script>
+<!-- Top Ad -->
+<script>
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-3",
+        "type": "topAd",
+        "elementId": "ya-top-ad"
+    });
+});
+</script>
+
+<!-- Floor Ads (Desktop + Touch) -->
+<script>
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-1",
+        "type": "floorAd",
+        "platform": "desktop",
+        "elementId": "ya-floor-ad"
+    });
+});
+window.yaContextCb.push(() => {
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-2",
+        "type": "floorAd",
+        "platform": "touch",
+        "elementId": "ya-floor-ad"
+    });
+});
+</script>
 </head>
 
 <body>
+	<div id="ya-top-ad"></div>
     <div id="overlays">
         <div id="helloDialog">
                 <div class="form-group">
@@ -137,6 +195,7 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
 
     <canvas id="canvas"></canvas>
     <input type="text" id="chat_textbox" placeholder="Нажмите Enter для чата" data-en-placeholder="Press Enter to chat" maxlength="200"/>
+	<div id="ya-floor-ad"></div>
 	<script>
 (function () {
 
@@ -160,6 +219,7 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
 </script>
 </body>
 </html>
+
 
 
 
