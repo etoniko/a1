@@ -27,7 +27,7 @@
 
                 <div class="form-group">
                     <input id="nick" class="form-control save" placeholder="Ник" data-en-placeholder="Nick" maxlength="16"/>
-                    <select id="gamemode" class="form-control" onchange="setServer($(this).val());" required>
+                    <select id="gamemode" class="form-control" onchange="setServer(this.value)" required>
 						<option value="ffa.agar.su:6008">FFA - 𝐒𝐨𝐥𝐨</option>
                         <option value="ffa.agar.su:6001">FFA - 𝙈𝙤𝙨𝙘𝙤𝙬</option>
 						<option value="ffa.agar.su:6002">MegaSplit5k1</option>
@@ -163,6 +163,7 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
 </script>
 </body>
 </html>
+
 
 
 
