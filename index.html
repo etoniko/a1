@@ -17,62 +17,53 @@
     <link href="./index.css?1" rel="stylesheet">
 	<script src="/ads.js"></script>
     <script src="./main_out.js?8"></script> 
-</head>
+	<!-- Yandex.Metrika counter -->
+<script type="text/javascript" >
+   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+   m[i].l=1*new Date();
+   for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+   k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+   ym(103054313, "init", {
+        clickmap:true,
+        trackLinks:true,
+        accurateTrackBounce:true
+   });
+</script>
+	<!-- Yandex.RTB -->
+<script>window.yaContextCb=window.yaContextCb||[]</script>
+<script src="https://yandex.ru/ads/system/context.js" async></script>
 <script>
-let adsLoaded = false;
+window.yaContextCb.push(() => {
 
-function loadAds() {
-    if (adsLoaded) return;
-    adsLoaded = true;
-
-    // очередь Яндекса
-    window.yaContextCb = window.yaContextCb || [];
-
-    // подключаем скрипт рекламы
-    const s = document.createElement("script");
-    s.src = "https://yandex.ru/ads/system/context.js";
-    s.async = true;
-    document.head.appendChild(s);
-
-    // когда загрузится — рендерим блоки
-    window.yaContextCb.push(() => {
-        Ya.Context.AdvManager.render({
-            blockId: "R-A-17463228-6",
-            renderTo: "yandex_rtb_R-A-17463228-6"
-        });
-        Ya.Context.AdvManager.render({
-            blockId: "R-A-17463228-7",
-            renderTo: "yandex_rtb_R-A-17463228-7"
-        });
-        Ya.Context.AdvManager.render({
-            blockId: "R-A-17463228-8",
-            renderTo: "yandex_rtb_R-A-17463228-8"
-        });
-        Ya.Context.AdvManager.render({
-            blockId: "R-A-17463228-9",
-            renderTo: "yandex_rtb_R-A-17463228-9"
-        });
+    // левый 300x600
+    Ya.Context.AdvManager.render({
+        blockId: "R-A-17463228-6",
+        renderTo: "yandex_rtb_R-A-17463228-6"
     });
-}
-</script>
-<script>
-const overlays = document.getElementById("overlays");
 
-// наблюдаем за сменой display
-const observer = new MutationObserver(() => {
-    const visible = overlays.style.display !== "none";
-    if (visible) {
-        loadAds(); // грузим рекламу только в меню
-    }
+    // правый 300x600
+    Ya.Context.AdvManager.render({
+        blockId: "R-A-17463228-7",
+        renderTo: "yandex_rtb_R-A-17463228-7"
+    });
+
+    // верх 970x250
+    Ya.Context.AdvManager.render({
+        blockId: "R-A-17463228-8",
+        renderTo: "yandex_rtb_R-A-17463228-8"
+    });
+
+    // низ 970x250
+    Ya.Context.AdvManager.render({
+        blockId: "R-A-17463228-9",
+        renderTo: "yandex_rtb_R-A-17463228-9"
+    });
+
 });
-
-observer.observe(overlays, { attributes: true, attributeFilter: ['style'] });
-
-// на случай первой загрузки страницы (меню открыто)
-if (overlays.style.display !== "none") {
-    loadAds();
-}
 </script>
+</head>
 
 <body>
     <div id="overlays">
@@ -223,17 +214,3 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
