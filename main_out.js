@@ -370,12 +370,14 @@ if (select && select.value) {
             this.disableCaptcha();
         }
     }
-wsConnect(token) {
+wsConnect(undefined, token) {
     if (this.ws) {
         this.ws.onopen = null;
         this.ws.onmessage = null;
         this.ws.onclose = null;
-        try { this.ws.close(); } catch (b) {}
+        try {
+            this.ws.close();
+        } catch (b) {}
         this.ws = null;
     }
 
@@ -389,15 +391,17 @@ wsConnect(token) {
 
     console.info("Connecting to " + wsUrl + "..");
 
-    const captchaToken = token || "";
-    const accountToken = localStorage.getItem("accountToken") || "";
+    // ✅ ПРАВИЛЬНО получаем токены
+    const captchaToken  = token || "";
+    const accountToken  = localStorage.getItem("accountToken") || "";
 
+    // 🔎 лог для дебага (очень советую оставить)
     console.log("captchaToken:", captchaToken);
     console.log("accountToken:", accountToken);
     console.log("origin:", location.origin);
 
-    const params =
-        `?token=${encodeURIComponent(captchaToken)}&accountToken=${encodeURIComponent(accountToken)}`;
+    // ✅ формируем query БЕЗ undefined
+    const params = `?token=${encodeURIComponent(captchaToken)}&accountToken=${encodeURIComponent(accountToken)}`;
 
     this.ws = new WebSocket(wsUrl + params, "eSejeKSVdysQvZs0ES1H");
     this.ws.binaryType = "arraybuffer";
@@ -405,6 +409,7 @@ wsConnect(token) {
     this.ws.onmessage = this.onWsMessage.bind(this);
     this.ws.onclose = this.onWsClose.bind(this);
 }
+
 
     prepareData(a) {
         return new DataView(new ArrayBuffer(a));
