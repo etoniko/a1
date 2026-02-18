@@ -36,7 +36,19 @@
 <script src="https://yandex.ru/ads/system/context.js" async></script>
 <script>
 window.yaContextCb.push(() => {
-
+	
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-4",
+        "type": "fullscreen",
+        "platform": "touch"
+    });
+	
+	    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-5",
+        "type": "fullscreen",
+        "platform": "desktop"
+    });
+	
     // левый 300x600
     Ya.Context.AdvManager.render({
         blockId: "R-A-17463228-6",
@@ -214,3 +226,4 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
 </script>
 </body>
 </html>
+
