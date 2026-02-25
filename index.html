@@ -30,46 +30,77 @@
         accurateTrackBounce:true
    });
 </script>
-	<!-- Yandex.RTB -->
-<script>window.yaContextCb=window.yaContextCb||[]</script>
+	<script>window.yaContextCb = window.yaContextCb || [];</script>
 <script src="https://yandex.ru/ads/system/context.js" async></script>
-<script>
-window.yaContextCb.push(() => {
-	
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-4",
-        "type": "fullscreen",
-        "platform": "touch"
-    });
-	
-    // левый 300x600
-    Ya.Context.AdvManager.render({
-        blockId: "R-A-17463228-6",
-        renderTo: "yandex_rtb_R-A-17463228-6"
-    });
-
-    // правый 300x600
-    Ya.Context.AdvManager.render({
-        blockId: "R-A-17463228-7",
-        renderTo: "yandex_rtb_R-A-17463228-7"
-    });
-
-    // верх 970x250
-    Ya.Context.AdvManager.render({
-        blockId: "R-A-17463228-8",
-        renderTo: "yandex_rtb_R-A-17463228-8"
-    });
-
-    // низ 970x250
-    Ya.Context.AdvManager.render({
-        blockId: "R-A-17463228-9",
-        renderTo: "yandex_rtb_R-A-17463228-9"
-    });
-
-});
-</script>
 </head>
+<script>
+(function () {
 
+    const overlay = document.getElementById("overlays");
+    let adsRendered = false;
+
+    function renderAds() {
+        if (adsRendered) return;
+        adsRendered = true;
+
+        window.yaContextCb.push(() => {
+
+            Ya.Context.AdvManager.render({
+                blockId: "R-A-17463228-6",
+                renderTo: "yandex_rtb_R-A-17463228-6"
+            });
+
+            Ya.Context.AdvManager.render({
+                blockId: "R-A-17463228-7",
+                renderTo: "yandex_rtb_R-A-17463228-7"
+            });
+
+            Ya.Context.AdvManager.render({
+                blockId: "R-A-17463228-8",
+                renderTo: "yandex_rtb_R-A-17463228-8"
+            });
+
+            Ya.Context.AdvManager.render({
+                blockId: "R-A-17463228-9",
+                renderTo: "yandex_rtb_R-A-17463228-9"
+            });
+
+        });
+    }
+
+    function clearAds() {
+        adsRendered = false;
+
+        [
+            "yandex_rtb_R-A-17463228-6",
+            "yandex_rtb_R-A-17463228-7",
+            "yandex_rtb_R-A-17463228-8",
+            "yandex_rtb_R-A-17463228-9"
+        ].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = "";
+        });
+    }
+
+    const observer = new MutationObserver(() => {
+
+        const isVisible = getComputedStyle(overlay).display === "block";
+
+        if (isVisible) {
+            renderAds();
+        } else {
+            clearAds();
+        }
+
+    });
+
+    observer.observe(overlay, {
+        attributes: true,
+        attributeFilter: ["style"]
+    });
+
+})();
+</script>
 <body>
     <div id="overlays">
     <!-- Боковые -->
@@ -219,6 +250,7 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
 </script>
 </body>
 </html>
+
 
 
 
