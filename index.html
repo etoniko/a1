@@ -14,7 +14,7 @@
     <link id="favicon" rel="icon" type="image/png" href="ico.png" />
     <link href='https://fonts.googleapis.com/css?family=Ubuntu:700' rel='stylesheet' type='text/css'>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
-    <link href="./index.css?1" rel="stylesheet">
+    <link href="./index.css?2" rel="stylesheet">
     <script src="./main_out.js?9"></script> 
 	<!-- Yandex.Metrika counter -->
 <script type="text/javascript" >
@@ -194,7 +194,15 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
         </div>
     </div>
 
-    <canvas id="canvas"></canvas>
+    <div style="
+    display: grid;
+"><canvas id="canvas"></canvas>
+<div id="cs" style="
+    width: 100%;
+    height: 100px;
+    background: white;
+"></div>
+</div>
     <input type="text" id="chat_textbox" placeholder="Нажмите Enter для чата" data-en-placeholder="Press Enter to chat" maxlength="200"/>
 	<script>
 (function () {
@@ -219,4 +227,5 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
 </script>
 </body>
 </html>
+
 
