@@ -669,9 +669,10 @@ console.log("WebSocket closed");
         requestAnimationFrame(this.redrawGameScene.bind(this));
     }
     canvasResize() {
+		const bannerHeight = document.querySelector(".ad-banner").offsetHeight;
         window.scrollTo(0, 0);
         this.canvasWidth = innerWidth;
-        this.canvasHeight = innerHeight;
+        this.canvasHeight = innerHeight - bannerHeight;
         this.nCanvas.width = this.canvasWidth;
         this.nCanvas.height = this.canvasHeight;
         this.drawGameScene();
