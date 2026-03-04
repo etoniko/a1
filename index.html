@@ -55,16 +55,16 @@ window.yaContextCb.push(() => {
     });
 
     // верх 970x250
-    Ya.Context.AdvManager.render({
+    /*Ya.Context.AdvManager.render({
         blockId: "R-A-17463228-8",
         renderTo: "yandex_rtb_R-A-17463228-8"
-    });
+    });*/
 
-    // низ 970x250
     Ya.Context.AdvManager.render({
-        blockId: "R-A-17463228-9",
-        renderTo: "yandex_rtb_R-A-17463228-9"
-    });
+        "blockId": "R-A-17463228-10",
+        "renderTo": "yandex_rtb_R-A-17463228-10",
+        "type": "feed"
+    })
 
 });
 </script>
@@ -75,10 +75,6 @@ window.yaContextCb.push(() => {
     <!-- Боковые -->
     <div id="ad1"><div id="yandex_rtb_R-A-17463228-6"></div></div>
     <div id="ad2"><div id="yandex_rtb_R-A-17463228-7"></div></div>
-    <!-- Верх -->
-    <div id="adTop"><div id="yandex_rtb_R-A-17463228-8"></div></div>
-    <!-- Низ -->
-    <div id="adBottom"><div id="yandex_rtb_R-A-17463228-9"></div></div>
         <div id="helloDialog">
                 <div class="form-group">
                     <h2 id="title" data-en="Matheus Valadares 👋🏿">Матеус Валадарес 👋🏻</h2>
@@ -198,7 +194,7 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
     <canvas id="canvas"></canvas>
 </div>
 
-<div class="ad-banner"></div>
+<div class="ad-banner"><div id="R-A-17463228-10"></div></div>
 	
     <input type="text" id="chat_textbox" placeholder="Нажмите Enter для чата" data-en-placeholder="Press Enter to chat" maxlength="200"/>
 	<script>
@@ -224,6 +220,7 @@ data-en="Move your mouse to control your cell<br>Press <b>Space</b> to split<br>
 </script>
 </body>
 </html>
+
 
 
 
