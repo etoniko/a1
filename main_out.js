@@ -5,6 +5,7 @@ class Game {
         this.currentWebSocketUrl = null;
         this.ws = null;
         this.Delay = 500;
+		this.captchaShown = false; // Добавляем флаг
         this.useHttps = location.protocol === "https:";
         // Canvas и отрисовка
         this.canvas = null;
@@ -196,12 +197,24 @@ getSkinForNick(nick) {
     getLevel(xp) {
         return ~~((xp / 100 * 2) ** 0.5);
     }
-    setNick(arg) {
-        this.hideOverlays();
-        this.userNickName = arg + "#";
+setNick(arg) {
+    // Сохраняем ник
+    this.userNickName = arg + "#";
+    
+    // Скрываем оверлей
+    this.hideOverlays();
+    
+    // Если капча еще не показывалась, показываем её
+    if (!this.captchaShown) {
+        this.showCaptcha();
+        this.captchaShown = true;
+    } else {
+        // Если капча уже была, отправляем ник напрямую
         this.sendNickName();
-        this.userScore = 0;
     }
+    
+    this.userScore = 0;
+}
     setSpect() {
         this.userNickName = null;
         this.sendUint8(1);
@@ -357,7 +370,7 @@ getSkinForNick(nick) {
             setInterval(this.drawGameScene.bind(this), 1E3 / 60);
         }
         setInterval(this.sendMouseMove.bind(this), 40);
-        setTimeout(this.showCaptcha.bind(this), 100);
+        //setTimeout(this.showCaptcha.bind(this), 100);
         document.querySelector("#overlays").style = "display:block;";
 		const select = document.getElementById("gamemode");
 if (select && select.value) {
