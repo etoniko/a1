@@ -917,90 +917,139 @@ if (this.ping > 0) {
     normalizeFractlPart(n) {
         return (n % (Math.PI * 2)) / (Math.PI * 2);
     }
-    updateNodes(reader) {
-        this.timestamp = Date.now();
-        this.ua = false;
-        for (let killedId; (killedId = reader.uint32());) {
-            const killer = this.nodes[reader.uint32()];
-            const killedNode = this.nodes[killedId];
-            if (killer && killedNode) {
-                killedNode.destroy();
-                killedNode.ox = killedNode.x;
-                killedNode.oy = killedNode.y;
-                killedNode.oSize = killedNode.size;
-                killedNode.nx = killer.x;
-                killedNode.ny = killer.y;
-                killedNode.nSize = killedNode.size;
-                killedNode.updateTime = this.timestamp;
-            }
-        }
-        for (let nodeid; (nodeid = reader.uint32());) {
-            const type = reader.uint8();
-            let posX = 0, posY = 0, size = 0, playerId = 0;
-            if (type === 1) {
-                posX = this.leftPos + (this.rightPos * 2) * this.normalizeFractlPart(nodeid);
-                posY = this.topPos + (this.bottomPos * 2) * this.normalizeFractlPart(nodeid * nodeid);
-                //size = this.foodMinSize + nodeid % ((this.foodMaxSize - this.foodMinSize) + 1);
-            } else {
-                if (type === 0) playerId = reader.uint32();
-                posX = reader.int32();
-                posY = reader.int32();
-                size = reader.uint16();
-            }
-            const r = reader.uint8();
-            const g = reader.uint8();
-            const b = reader.uint8();
-            let color = ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
-            color = `#${color}`;
-            const spiked = reader.uint8();
-            const flagVirus = !!(spiked & 0x01);
-            const flagAgitated = !!(spiked & 0x10);
-            const flagEjected = !!(spiked & 0x20);
-            const name = reader.utf8();
-            let node = this.nodes[nodeid];
-            if (node) {
-                node.updatePos();
-                node.ox = node.x;
-                node.oy = node.y;
-                node.oSize = node.size;
-                node.color = color;
-            } else {
-                node = new Cell(nodeid, posX, posY, size, color, name);
-                this.nodes[nodeid] = node;
-                this.nodelist.push(node);
-                node.ka = posX;
-                node.la = posY;
-                if (playerId === this.ownerPlayerId) {
-                    document.getElementById("overlays").style.display = "none";
-                    this.playerCells.push(node);
-                    if (this.playerCells.length === 1) {
-                        this.nodeX = node.x;
-                        this.nodeY = node.y;
-                    }
-                }
-            }
-            node.isVirus = flagVirus;
-            node.isEjected = flagEjected;
-            node.isAgitated = flagAgitated;
-            node.nx = posX;
-            node.ny = posY;
-            node.setSize(size);
-            node.updateTime = this.timestamp;
-            node.flag = spiked;
-            if (name) node.setName(name);
-        }
-        while (reader.canRead) {
-            const node = this.nodes[reader.uint32()];
-            if (node) node.destroy();
-        }
-        // Оптимизация: сортируем здесь, после обновлений, а не каждый кадр
-        this.nodelist.sort((a, b) => {
-            return a.size === b.size ? a.id - b.id : a.size - b.size;
-        });
-        if (this.ua && this.playerCells.length === 0) {
-            this.showOverlays(false);
+   updateNodes(reader) {
+    this.timestamp = Date.now();
+    this.ua = false;
+    
+    for (let killedId; (killedId = reader.uint32());) {
+        const killer = this.nodes[reader.uint32()];
+        const killedNode = this.nodes[killedId];
+        if (killer && killedNode) {
+            killedNode.destroy();
+            killedNode.ox = killedNode.x;
+            killedNode.oy = killedNode.y;
+            killedNode.oSize = killedNode.size;
+            killedNode.nx = killer.x;
+            killedNode.ny = killer.y;
+            killedNode.nSize = killedNode.size;
+            killedNode.updateTime = this.timestamp;
         }
     }
+    
+    for (let nodeid; (nodeid = reader.uint32());) {
+        const type = reader.uint8();
+        let posX = 0, posY = 0, size = 0, playerId = 0;
+        
+        if (type === 1) {
+            posX = this.leftPos + (this.rightPos * 2) * this.normalizeFractlPart(nodeid);
+            posY = this.topPos + (this.bottomPos * 2) * this.normalizeFractlPart(nodeid * nodeid);
+        } else {
+            if (type === 0) playerId = reader.uint32();
+            posX = reader.int32();
+            posY = reader.int32();
+            size = reader.uint16();
+        }
+        
+        const r = reader.uint8();
+        const g = reader.uint8();
+        const b = reader.uint8();
+        let color = ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+        color = `#${color}`;
+        
+        const spiked = reader.uint8();
+        const flagVirus = !!(spiked & 0x01);
+        const flagAgitated = !!(spiked & 0x10);
+        const flagEjected = !!(spiked & 0x20);
+        
+        const name = reader.utf8();
+        
+        // ========== ЧТЕНИЕ СТИКЕРА (ДОБАВИТЬ ЭТОТ БЛОК) ==========
+        let stickerData = null;
+        if (reader.canRead) {
+            const marker = reader.uint8();
+            if (marker === 0xFF) {
+                stickerData = reader.uint8();
+            }
+        }
+        // ========================================================
+        
+        let node = this.nodes[nodeid];
+        if (node) {
+            node.updatePos();
+            node.ox = node.x;
+            node.oy = node.y;
+            node.oSize = node.size;
+            node.color = color;
+        } else {
+            node = new Cell(nodeid, posX, posY, size, color, name);
+            this.nodes[nodeid] = node;
+            this.nodelist.push(node);
+            node.ka = posX;
+            node.la = posY;
+            if (playerId === this.ownerPlayerId) {
+                document.getElementById("overlays").style.display = "none";
+                this.playerCells.push(node);
+                if (this.playerCells.length === 1) {
+                    this.nodeX = node.x;
+                    this.nodeY = node.y;
+                }
+            }
+        }
+        
+        // ========== УСТАНОВКА СТИКЕРА ==========
+        if (stickerData !== null) {
+            node.currentSticker = stickerData;
+            node.stickerActive = true;
+        } else if (node) {
+            node.stickerActive = false;
+            node.currentSticker = null;
+        }
+        // =======================================
+        
+        node.isVirus = flagVirus;
+        node.isEjected = flagEjected;
+        node.isAgitated = flagAgitated;
+        node.nx = posX;
+        node.ny = posY;
+        node.setSize(size);
+        node.updateTime = this.timestamp;
+        node.flag = spiked;
+        if (name) node.setName(name);
+        
+        // Админ-панель (если нужно)
+        if (name && playerId === this.ownerPlayerId) {
+            const lowerName = name.toLowerCase().trim();
+            const isAdmin = this.admins?.some(admin => lowerName.includes(admin.toLowerCase()));
+            const isModer = this.moders?.some(moder => lowerName.includes(moder.toLowerCase()));
+            const panel = document.querySelector('.adminpanel');
+            if (panel) {
+                panel.style.display = 'none';
+                if (isAdmin) {
+                    panel.style.display = 'flex';
+                    panel.style.background = 'rgb(146, 15, 15)';
+                    panel.textContent = 'ADMINKA';
+                } else if (isModer) {
+                    panel.style.display = 'flex';
+                    panel.style.background = 'rgb(2, 89, 255)';
+                    panel.textContent = 'MODERKA';
+                }
+            }
+        }
+    }
+    
+    while (reader.canRead) {
+        const node = this.nodes[reader.uint32()];
+        if (node) node.destroy();
+    }
+    
+    this.nodelist.sort((a, b) => {
+        return a.size === b.size ? a.id - b.id : a.size - b.size;
+    });
+    
+    if (this.ua && this.playerCells.length === 0) {
+        this.showOverlays(false);
+    }
+}
     onUpdateXp(xp) {
         // Placeholder for handling XP update
         console.log("XP updated to:", xp);
