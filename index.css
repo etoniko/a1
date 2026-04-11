@@ -7,7 +7,7 @@ body {
 }
 
 /* IDs */
-
+.from-send{display: flex;background: white;margin-top: 10px;align-items: center;border-radius: 20px;margin-bottom: 20px;}
 #overlays {
     display:none; 
     position: absolute; 
@@ -108,12 +108,28 @@ body {
 }
 
 #nick {
-    width: 65%;
-    float: left;
+    width: 100%;
+    outline: none;
+    border: 0px;
+    height: 33px;
+    padding-left: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    margin-right: 10px;
+}
+#pass {
+    display: none;
+    width: 80px;
+    height: 33px;
+    padding-left: 5px;
+    outline: none;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-right: 10px;
 }
 
 #gamemode {
-    width: 33%;
+    width: 100px;
     float: right;
 }
 
