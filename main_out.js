@@ -196,13 +196,8 @@ getSkinForNick(nick) {
         return ~~((xp / 100 * 2) ** 0.5);
     }
 setNick(arg) {
-    // Сохраняем ник
     this.userNickName = arg + "#";
-    
-    // Скрываем оверлей
     this.hideOverlays();
-    
-	    // Если капча еще не показывалась, показываем её
     if (!this.connectShown) {
         this.showConnecting();
         this.connectShown = true;
@@ -212,11 +207,17 @@ setNick(arg) {
     }
     this.userScore = 0;
 }
-    setSpect() {
-        this.userNickName = null;
+setSpect() {
+    this.userNickName = null;
+    if (!this.connectShown) {
+        this.showConnecting();
+        this.connectShown = true;
+    } else {
         this.sendUint8(1);
-        this.hideOverlays();
     }
+    
+    this.hideOverlays();
+}
     setServer(arg) {
         if (arg !== this.CONNECTION_URL) {
             this.CONNECTION_URL = arg;
