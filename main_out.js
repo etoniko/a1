@@ -4,8 +4,8 @@ class Game {
         this.CONNECTION_URL = "";
         this.currentWebSocketUrl = null;
         this.ws = null;
+		this.connectShown = false; // Добавляем флаг
         this.Delay = 500;
-		this.captchaShown = false; // Добавляем флаг
         this.useHttps = location.protocol === "https:";
         // Canvas и отрисовка
         this.canvas = null;
@@ -71,8 +71,6 @@ class Game {
         this.spacePressed = false;
         this.wPressed = false;
         this.hasOverlay = true;
-        // Капча
-        this.captchaId = null;
         //прочее
         this.z = 1;
         this.cellColors = [];
@@ -204,15 +202,14 @@ setNick(arg) {
     // Скрываем оверлей
     this.hideOverlays();
     
-    // Если капча еще не показывалась, показываем её
-    if (!this.captchaShown) {
-        this.showCaptcha();
-        this.captchaShown = true;
+	    // Если капча еще не показывалась, показываем её
+    if (!this.connectShown) {
+        this.showConnecting();
+        this.connectShown = true;
     } else {
-        // Если капча уже была, отправляем ник напрямую
-        this.sendNickName();
+    // Отправляем ник напрямую (без капчи)
+    this.sendNickName();
     }
-    
     this.userScore = 0;
 }
     setSpect() {
@@ -223,52 +220,13 @@ setNick(arg) {
     setServer(arg) {
         if (arg !== this.CONNECTION_URL) {
             this.CONNECTION_URL = arg;
-            this.showCaptcha();
+            // Прямой коннект без капчи
+            if (this.ma) {
+                this.showConnecting();
+            }
         }
     }
-    onCaptchaSuccess(token) {
-        this.showConnecting(token);
-    }
-    renderCaptcha() {
-        if (this.captchaId !== null) { // Сбрасываем капчу если она уже создана
-            document.getElementById('captcha-overlay').style.display = '';
-            turnstile.reset(this.captchaId);
-            return;
-        }
-        const overlay = document.createElement("div");
-        overlay.id = "captcha-overlay";
-        const container = document.createElement("div");
-        container.id = "captcha-container";
-        overlay.appendChild(container);
-        document.body.prepend(overlay);
-        this.captchaId = turnstile.render(container, {
-            sitekey: "0x4AAAAAAA0keHJ56_KNR0MU",
-            callback: this.onCaptchaSuccess.bind(this)
-        });
-    }
-    showCaptcha() {
-        if (window.turnstile) return this.renderCaptcha();
-        const node = document.createElement('script');
-        node.setAttribute('src', 'https://challenges.cloudflare.com/turnstile/v0/api.js');
-        node.setAttribute('async', 'async');
-        node.setAttribute('defer', 'defer');
-        node.onload = () => {
-            this.renderCaptcha();
-        };
-        node.onerror = () => {
-            alert("Не удалось загрузить библиотеку Captcha. Попробуйте обновить браузер");
-        };
-        document.head.appendChild(node);
-    }
-    disableCaptcha() {
-        const captchaOverlay = document.getElementById('captcha-overlay');
-        if (captchaOverlay) captchaOverlay.remove();
-        const scripts = document.querySelectorAll('script[src*="challenges.cloudflare.com/turnstile"]');
-        scripts.forEach(s => s.remove());
-        if (window.turnstile) delete window.turnstile;
-        this.captchaId = null;
-        console.log("Captcha полностью отключена до перезагрузки страницы или соединение нового сервера");
-    }
+
     gameLoop() {
         this.ma = true;
         document.getElementById("canvas").focus();
@@ -370,7 +328,6 @@ setNick(arg) {
             setInterval(this.drawGameScene.bind(this), 1E3 / 60);
         }
         setInterval(this.sendMouseMove.bind(this), 40);
-        //setTimeout(this.showCaptcha.bind(this), 100);
         document.querySelector("#overlays").style = "display:block;";
 		const select = document.getElementById("gamemode");
 if (select && select.value) {
@@ -396,7 +353,7 @@ if (select && select.value) {
         this.userNickName = null;
         document.querySelector("#overlays").style = "display:block;";
     }
-    showConnecting(token) {
+    showConnecting() {
         const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
         if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentWebSocketUrl === wsUrl) {
             console.log("Соединение уже активно для этого URL, пропускаем повторное подключение.");
@@ -404,49 +361,40 @@ if (select && select.value) {
         }
         if (this.ma) {
             this.currentWebSocketUrl = wsUrl;
-            this.wsConnect(wsUrl, token);
-            this.disableCaptcha();
+            this.wsConnect(wsUrl);
         }
     }
-wsConnect(undefined, token) {
-    if (this.ws) {
-        this.ws.onopen = null;
-        this.ws.onmessage = null;
-        this.ws.onclose = null;
-        try {
-            this.ws.close();
-        } catch (b) {}
-        this.ws = null;
+    
+    wsConnect(undefined) {
+        if (this.ws) {
+            this.ws.onopen = null;
+            this.ws.onmessage = null;
+            this.ws.onclose = null;
+            try {
+                this.ws.close();
+            } catch (b) {}
+            this.ws = null;
+        }
+
+        const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
+        this.playerCells = [];
+        this.nodes = {};
+        this.nodelist = [];
+        this.Cells = [];
+        this.leaderBoard = [];
+
+        console.info("Connecting to " + wsUrl + "..");
+
+        // Прямой коннект без капчи
+        const accountToken = localStorage.getItem("accountToken") || "";
+        const params = `?accountToken=${encodeURIComponent(accountToken)}`;
+
+        this.ws = new WebSocket(wsUrl + params, "eSejeKSVdysQvZs0ES1H");
+        this.ws.binaryType = "arraybuffer";
+        this.ws.onopen = this.onWsOpen.bind(this);
+        this.ws.onmessage = this.onWsMessage.bind(this);
+        this.ws.onclose = this.onWsClose.bind(this);
     }
-
-    const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
-
-    this.playerCells = [];
-    this.nodes = {};
-    this.nodelist = [];
-    this.Cells = [];
-    this.leaderBoard = [];
-
-    console.info("Connecting to " + wsUrl + "..");
-
-    // ✅ ПРАВИЛЬНО получаем токены
-    const captchaToken  = token || "";
-    const accountToken  = localStorage.getItem("accountToken") || "";
-
-    // 🔎 лог для дебага (очень советую оставить)
-    console.log("captchaToken:", captchaToken);
-    console.log("accountToken:", accountToken);
-    console.log("origin:", location.origin);
-
-    // ✅ формируем query БЕЗ undefined
-    const params = `?token=${encodeURIComponent(captchaToken)}&accountToken=${encodeURIComponent(accountToken)}`;
-
-    this.ws = new WebSocket(wsUrl + params, "eSejeKSVdysQvZs0ES1H");
-    this.ws.binaryType = "arraybuffer";
-    this.ws.onopen = this.onWsOpen.bind(this);
-    this.ws.onmessage = this.onWsMessage.bind(this);
-    this.ws.onclose = this.onWsClose.bind(this);
-}
 
 
     prepareData(a) {
