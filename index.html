@@ -14,7 +14,7 @@
     <link id="favicon" rel="icon" type="image/png" href="ico.png" />
     <link href="./index.css" rel="stylesheet">
 	<link href="./bootstrap.min.css" rel="stylesheet">
-    <script src="./main_out.js?1"></script>
+    <script src="./main_out.js?3"></script>
 	<script src="https://agar.su/assets/scripts/pass.js?0.0.2" defer></script>
 	<!-- Yandex.Metrika counter -->
 <script type="text/javascript" >
@@ -180,9 +180,11 @@ window.yaContextCb.push(() => {
     </div>
 
     <div id="connecting">
-        <div style="width: 350px; background-color: #FFFFFF; margin: 100px auto; border-radius: 15px; padding: 5px 15px 5px 15px;">
-<h2 data-en="Connecting">Подключение</h2>
-<p data-en="If you cannot connect to servers, send message telegram">Если не удаётся подключиться к серверу — напшии в телеграмм</p>
+        <div class="connecting-box">
+            <h2 data-en="Connecting">Подключение</h2>
+            <p id="connect-status">Проверка и подключение к серверу…</p>
+            <div class="connect-progress-wrap"><div id="connect-progress"></div></div>
+            <p class="connect-hint" data-en="If you cannot connect to servers, send message telegram">Если не удаётся подключиться — напишите в телеграм</p>
         </div>
     </div>
 
