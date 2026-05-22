@@ -501,8 +501,6 @@ if (select && select.value) {
         } catch (err) {
             console.error("Connect token error:", err);
             this.connectInProgress = false;
-            setConnectingUI("Ошибка подключения, повтор…", 0);
-            setTimeout(() => this.showConnecting(), 2000);
             return;
         }
 
