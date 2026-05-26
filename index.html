@@ -14,7 +14,7 @@
     <link id="favicon" rel="icon" type="image/png" href="ico.png" />
     <link href="./index.css" rel="stylesheet">
 	<link href="./bootstrap.min.css" rel="stylesheet">
-    <script src="./main_out.js?3"></script>
+    <script src="./main_out.js?4"></script>
 	<script src="https://agar.su/assets/scripts/pass.js?0.0.2" defer></script>
 	<!-- Yandex.Metrika counter -->
 <script type="text/javascript" >
@@ -185,6 +185,14 @@ window.yaContextCb.push(() => {
             <p id="connect-status">Проверка и подключение к серверу…</p>
             <div class="connect-progress-wrap"><div id="connect-progress"></div></div>
             <p class="connect-hint" data-en="If you cannot connect to servers, send message telegram">Если не удаётся подключиться — напишите в телеграм</p>
+        </div>
+    </div>
+
+    <div id="disconnected">
+        <div class="connecting-box">
+            <h2 data-en="Connection lost">Соединение потеряно</h2>
+            <p id="disconnect-status" data-en="Network disconnected. Check your internet and press Reconnect.">Обрыв сети. Проверьте интернет и нажмите «Переподключиться».</p>
+            <button type="button" id="reconnect-btn" class="btn btn-play btn-primary btn-needs-server" data-en="Reconnect">Переподключиться</button>
         </div>
     </div>
 
