@@ -112,7 +112,10 @@ class Game {
         this.ws = null;
 		this.connectShown = false;
         this.connectInProgress = false;
-        this.Delay = 500;
+        this.wasEverConnected = false;
+        this.wsClosingIntentional = false;
+        this.pingIntervalId = null;
+        this.disconnectedVisible = false;
         this.useHttps = location.protocol === "https:";
         // Canvas и отрисовка
         this.canvas = null;
@@ -329,6 +332,9 @@ setSpect() {
         if (arg !== this.CONNECTION_URL) {
             this.CONNECTION_URL = arg;
             if (this.ma) {
+                this.hideDisconnected();
+                document.querySelector("#connecting").style.display = "block";
+                setConnectingUI("Подключение к серверу…", 5);
                 this.showConnecting();
             }
         }
@@ -440,6 +446,10 @@ setSpect() {
 if (select && select.value) {
     this.CONNECTION_URL = select.value;
 }
+        const reconnectBtn = document.getElementById("reconnect-btn");
+        if (reconnectBtn) {
+            reconnectBtn.addEventListener("click", () => this.manualReconnect());
+        }
     }
     handleWheel(event) {
         this.zoom *= Math.pow(.9, event.wheelDelta / -120 || event.detail || 0);
@@ -460,6 +470,32 @@ if (select && select.value) {
         this.userNickName = null;
         document.querySelector("#overlays").style = "display:block;";
     }
+    hideDisconnected() {
+        this.disconnectedVisible = false;
+        const box = document.querySelector("#disconnected");
+        if (box) box.style.display = "none";
+    }
+    showDisconnected() {
+        this.disconnectedVisible = true;
+        const box = document.querySelector("#disconnected");
+        const connecting = document.querySelector("#connecting");
+        if (connecting) connecting.style.display = "none";
+        if (box) box.style.display = "block";
+    }
+    clearGameState() {
+        this.playerCells = [];
+        this.nodes = {};
+        this.nodelist = [];
+        this.Cells = [];
+        this.leaderBoard = [];
+    }
+    manualReconnect() {
+        if (this.connectInProgress) return;
+        this.hideDisconnected();
+        document.querySelector("#connecting").style.display = "block";
+        setConnectingUI("Подключение к серверу…", 5);
+        this.showConnecting();
+    }
     showConnecting() {
         const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
         if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentWebSocketUrl === wsUrl) {
@@ -478,6 +514,7 @@ if (select && select.value) {
         setConnectingUI("Подключение к серверу…", 5);
 
         if (this.ws) {
+            this.wsClosingIntentional = true;
             this.ws.onopen = null;
             this.ws.onmessage = null;
             this.ws.onclose = null;
@@ -489,11 +526,7 @@ if (select && select.value) {
 
         const host = this.CONNECTION_URL;
         const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + host;
-        this.playerCells = [];
-        this.nodes = {};
-        this.nodelist = [];
-        this.Cells = [];
-        this.leaderBoard = [];
+        this.clearGameState();
 
         let connectToken = "";
         try {
@@ -527,10 +560,11 @@ if (select && select.value) {
     }
     onWsOpen() {
         let msg;
-        this.delay = 500;
+        this.wasEverConnected = true;
+        this.hideDisconnected();
         const bar = document.getElementById("connect-progress");
         if (bar) bar.style.width = "100%";
-        document.querySelector("#connecting").style = "display:none;";
+        document.querySelector("#connecting").style.display = "none";
         msg = this.prepareData(5);
         msg.setUint8(0, 254);
         msg.setUint32(1, 5, true);
@@ -541,16 +575,31 @@ if (select && select.value) {
         this.wsSend(msg);
         this.sendNickName();
         console.info("Connection successful!");
-		     setInterval(() => {    
-if (!document.hidden) {        
-    this.pingstamp = Date.now();           
-	this.wsSend(new Uint8Array([2])); // ping        
-}      
-    }, 3000);
-	setTimeout(() => { this.sendChat("вошёл в игру!"); }, 1000); 
+        if (this.pingIntervalId != null) {
+            clearInterval(this.pingIntervalId);
+        }
+        this.pingIntervalId = setInterval(() => {
+            if (!document.hidden && this.wsIsOpen()) {
+                this.pingstamp = Date.now();
+                this.wsSend(new Uint8Array([2]));
+            }
+        }, 3000);
+        setTimeout(() => { this.sendChat("вошёл в игру!"); }, 1000);
     }
     onWsClose() {
-console.log("WebSocket closed");
+        console.log("WebSocket closed");
+        if (this.pingIntervalId != null) {
+            clearInterval(this.pingIntervalId);
+            this.pingIntervalId = null;
+        }
+        this.ws = null;
+        if (this.wsClosingIntentional) {
+            this.wsClosingIntentional = false;
+            return;
+        }
+        if (!this.wasEverConnected || !this.connectShown) return;
+        this.clearGameState();
+        this.showDisconnected();
     }
     onWsMessage(msg) {
         this.handleWsMessage(new DataView(msg.data));
