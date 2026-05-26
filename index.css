@@ -108,7 +108,8 @@ body {
     height: 100%;
 }
 
-#connecting {
+#connecting,
+#disconnected {
     display:none;
     position: absolute; 
     left: 0; 
@@ -117,6 +118,17 @@ body {
     bottom: 0; 
     z-index: 100; 
     background-color: rgba(0,0,0,0.5);
+}
+#disconnected .connecting-box {
+    text-align: center;
+}
+#disconnect-status {
+    margin: 8px 0 14px;
+    font-size: 14px;
+    color: #333;
+}
+#reconnect-btn {
+    width: 100%;
 }
 .connecting-box {
     width: 350px;
