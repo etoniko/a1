@@ -115,6 +115,9 @@ class Game {
         this.wasEverConnected = false;
         this.wsClosingIntentional = false;
         this.pingIntervalId = null;
+        this.tabHiddenCloseTimer = null;
+        this.tabHiddenSince = null;
+        this.tabHiddenCloseSec = 60;
         this.disconnectedVisible = false;
         this.useHttps = location.protocol === "https:";
         // Canvas и отрисовка
@@ -430,9 +433,18 @@ setSpect() {
             }
         };
         onblur = () => {
-            this.sendUint8(19);
             this.wPressed = this.spacePressed = false;
         };
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                this.scheduleTabHiddenClose();
+            } else {
+                this.onTabVisibleAgain();
+            }
+        });
+        window.addEventListener("pagehide", () => {
+            this.scheduleTabHiddenClose();
+        });
         onresize = this.canvasResize.bind(this);
         this.canvasResize();
         if (requestAnimationFrame) {
@@ -495,6 +507,50 @@ if (select && select.value) {
         document.querySelector("#connecting").style.display = "block";
         setConnectingUI("Подключение к серверу…", 5);
         this.showConnecting();
+    }
+    scheduleTabHiddenClose() {
+        if (this.tabHiddenSince == null) {
+            this.tabHiddenSince = Date.now();
+        }
+        if (this.tabHiddenCloseTimer != null) return;
+        const remaining = Math.max(0, this.tabHiddenCloseSec * 1000 - (Date.now() - this.tabHiddenSince));
+        this.tabHiddenCloseTimer = setTimeout(() => {
+            this.tabHiddenCloseTimer = null;
+            this.closeWsForHiddenTab();
+        }, remaining);
+    }
+    onTabVisibleAgain() {
+        if (this.tabHiddenSince != null) {
+            const elapsed = Date.now() - this.tabHiddenSince;
+            if (elapsed >= this.tabHiddenCloseSec * 1000) {
+                if (this.wsIsOpen()) {
+                    this.closeWsForHiddenTab();
+                } else if (this.wasEverConnected && this.connectShown && !this.disconnectedVisible) {
+                    this.clearGameState();
+                    this.showDisconnected();
+                }
+            }
+        }
+        this.cancelTabHiddenClose();
+    }
+    closeWsForHiddenTab() {
+        if (!this.wsIsOpen()) return;
+        this.wsClosingIntentional = true;
+        if (this.pingIntervalId != null) {
+            clearInterval(this.pingIntervalId);
+            this.pingIntervalId = null;
+        }
+        try {
+            this.ws.close();
+        } catch (e) {}
+        this.ws = null;
+    }
+    cancelTabHiddenClose() {
+        if (this.tabHiddenCloseTimer != null) {
+            clearTimeout(this.tabHiddenCloseTimer);
+            this.tabHiddenCloseTimer = null;
+        }
+        this.tabHiddenSince = null;
     }
     showConnecting() {
         const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
@@ -561,6 +617,11 @@ if (select && select.value) {
     onWsOpen() {
         let msg;
         this.wasEverConnected = true;
+        if (document.hidden) {
+            this.scheduleTabHiddenClose();
+        } else {
+            this.cancelTabHiddenClose();
+        }
         this.hideDisconnected();
         const bar = document.getElementById("connect-progress");
         if (bar) bar.style.width = "100%";
@@ -588,12 +649,21 @@ if (select && select.value) {
     }
     onWsClose() {
         console.log("WebSocket closed");
+        const closedForHiddenTab = this.wsClosingIntentional;
+        if (closedForHiddenTab) {
+            if (this.tabHiddenCloseTimer != null) {
+                clearTimeout(this.tabHiddenCloseTimer);
+                this.tabHiddenCloseTimer = null;
+            }
+        } else {
+            this.cancelTabHiddenClose();
+        }
         if (this.pingIntervalId != null) {
             clearInterval(this.pingIntervalId);
             this.pingIntervalId = null;
         }
         this.ws = null;
-        if (this.wsClosingIntentional) {
+        if (closedForHiddenTab) {
             this.wsClosingIntentional = false;
             return;
         }
