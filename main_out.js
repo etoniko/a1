@@ -117,7 +117,7 @@ class Game {
         this.pingIntervalId = null;
         this.tabHiddenCloseTimer = null;
         this.tabHiddenSince = null;
-        this.tabHiddenCloseSec = 60;
+        this.tabHiddenCloseSec = 600;
         this.disconnectedVisible = false;
         this.useHttps = location.protocol === "https:";
         // Canvas и отрисовка
