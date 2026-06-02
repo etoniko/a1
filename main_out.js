@@ -5,6 +5,15 @@ function getConnectApiBase(host) {
     return "https://" + h;
 }
 
+/** ffa.agar.su:6007 — старый сервер без /challenge */
+function gameServerNeedsConnectPow(hostOrUrl) {
+    const h = String(hostOrUrl || "")
+        .replace(/^wss?:\/\//i, "")
+        .replace(/\/$/, "")
+        .toLowerCase();
+    return h !== "ffa.agar.su:6007";
+}
+
 function setConnectingUI(text, pct) {
     const box = document.querySelector("#connecting");
     const status = document.getElementById("connect-status");
@@ -581,25 +590,31 @@ if (select && select.value) {
         }
 
         const host = this.CONNECTION_URL;
+        const needsPow = gameServerNeedsConnectPow(host);
         const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + host;
         this.clearGameState();
 
         let connectToken = "";
-        try {
-            connectToken = await fetchConnectToken(host);
-        } catch (err) {
-            console.error("Connect token error:", err);
-            this.connectInProgress = false;
-            return;
+        if (needsPow) {
+            try {
+                connectToken = await fetchConnectToken(host);
+            } catch (err) {
+                console.error("Connect token error:", err);
+                this.connectInProgress = false;
+                return;
+            }
+        } else {
+            setConnectingUI("Подключение к серверу…", 72);
         }
 
         const qs = new URLSearchParams();
         const accountToken = localStorage.getItem("accountToken") || "";
         if (accountToken) qs.set("accountToken", accountToken);
-        qs.set("connectToken", connectToken);
+        if (needsPow && connectToken) qs.set("connectToken", connectToken);
 
-        console.info("Connecting to " + wsUrl + "..");
-        this.ws = new WebSocket(wsUrl + "?" + qs.toString(), "eSejeKSVdysQvZs0ES1H");
+        const wsTarget = qs.toString() ? wsUrl + "?" + qs.toString() : wsUrl;
+        console.info("Connecting to " + wsTarget + "..");
+        this.ws = new WebSocket(wsTarget, "eSejeKSVdysQvZs0ES1H");
         this.ws.binaryType = "arraybuffer";
         this.ws.onopen = this.onWsOpen.bind(this);
         this.ws.onmessage = this.onWsMessage.bind(this);
