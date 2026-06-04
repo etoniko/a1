@@ -568,16 +568,38 @@ if (select && select.value) {
     }
 
     connectGameserver(wsUrl) {
-        const qs = new URLSearchParams();
-        const accountToken = localStorage.getItem("accountToken") || "";
-        if (accountToken) qs.set("accountToken", accountToken);
-        const query = qs.toString();
-        console.info("Connecting to " + wsUrl + "..");
-        this.ws = new WebSocket(wsUrl + (query ? "?" + query : ""), "eSejeKSVdysQvZs0ES1H");
-        this.ws.binaryType = "arraybuffer";
-        this.ws.onopen = this.onWsOpen.bind(this);
-        this.ws.onmessage = this.onWsMessage.bind(this);
-        this.ws.onclose = this.onWsClose.bind(this);
+        return new Promise((resolve, reject) => {
+            const qs = new URLSearchParams();
+            const accountToken = localStorage.getItem("accountToken") || "";
+            if (accountToken) qs.set("accountToken", accountToken);
+            const query = qs.toString();
+            console.info("Connecting to " + wsUrl + "..");
+            const socket = new WebSocket(
+                wsUrl + (query ? "?" + query : ""),
+                "eSejeKSVdysQvZs0ES1H"
+            );
+            this.ws = socket;
+            socket.binaryType = "arraybuffer";
+            let settled = false;
+            const fail = (err) => {
+                if (settled) return;
+                settled = true;
+                this.ws = null;
+                reject(err || new Error("WebSocket failed"));
+            };
+            socket.onopen = () => {
+                if (settled) return;
+                settled = true;
+                this.onWsOpen();
+                resolve();
+            };
+            socket.onmessage = this.onWsMessage.bind(this);
+            socket.onclose = (evt) => {
+                this.onWsClose(evt);
+                if (!settled) fail(new Error("WebSocket closed"));
+            };
+            socket.onerror = () => fail(new Error("WebSocket error"));
+        });
     }
 
     async joinServer(wsUrlArg) {
@@ -585,11 +607,17 @@ if (select && select.value) {
         this.connectInProgress = true;
         document.querySelector("#connecting").style.display = "block";
 
+        if (this.pingIntervalId != null) {
+            clearInterval(this.pingIntervalId);
+            this.pingIntervalId = null;
+        }
+
         if (this.ws) {
             this.wsClosingIntentional = true;
             this.ws.onopen = null;
             this.ws.onmessage = null;
             this.ws.onclose = null;
+            this.ws.onerror = null;
             try { this.ws.close(); } catch (b) {}
             this.ws = null;
         }
@@ -599,16 +627,15 @@ if (select && select.value) {
 
         try {
             await runPowVerificationMain1();
+            setConnectingUI("Подключение к gameserver…", 90);
+            await this.connectGameserver(wsUrl);
         } catch (err) {
-            console.error("PoW error:", err);
-            this.connectInProgress = false;
-            setConnectingUI("Ошибка проверки, повтор…", 0);
+            console.error("Connect error:", err);
+            setConnectingUI("Ошибка подключения, повтор…", 0);
             return;
+        } finally {
+            this.connectInProgress = false;
         }
-
-        setConnectingUI("Подключение к gameserver…", 90);
-        this.connectGameserver(wsUrl);
-        this.connectInProgress = false;
     }
 
     async wsConnect(wsUrlArg) {
@@ -620,6 +647,7 @@ if (select && select.value) {
         return new DataView(new ArrayBuffer(a));
     }
     wsSend(a) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
         this.ws.send(a.buffer);
     }
     onWsOpen() {
