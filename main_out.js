@@ -1,5 +1,3 @@
-const POW_API_BASE = "https://api.agar.su:6005";
-
 function setConnectingUI(text, pct) {
     const box = document.querySelector("#connecting");
     const status = document.getElementById("connect-status");
@@ -7,101 +5,6 @@ function setConnectingUI(text, pct) {
     if (box) box.style.display = "block";
     if (status && text) status.textContent = text;
     if (bar && pct != null) bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
-}
-
-const _sha256KMain1 = new Uint32Array([
-    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
-]);
-
-function sha256HexMain1(text) {
-    const enc = new TextEncoder().encode(String(text));
-    const len = enc.length;
-    const bitLen = len * 8;
-    const padLen = ((len + 9 + 63) >> 6) << 6;
-    const buf = new Uint8Array(padLen);
-    buf.set(enc);
-    buf[len] = 0x80;
-    const view = new DataView(buf.buffer);
-    view.setUint32(padLen - 4, bitLen, false);
-    let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
-    let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
-    const w = new Uint32Array(64);
-    for (let off = 0; off < padLen; off += 64) {
-        for (let i = 0; i < 16; i++) w[i] = view.getUint32(off + i * 4, false);
-        for (let i = 16; i < 64; i++) {
-            const s0 = ((w[i - 15] >>> 7) | (w[i - 15] << 25)) ^ ((w[i - 15] >>> 18) | (w[i - 15] << 14)) ^ (w[i - 15] >>> 3);
-            const s1 = ((w[i - 2] >>> 17) | (w[i - 2] << 15)) ^ ((w[i - 2] >>> 19) | (w[i - 2] << 13)) ^ (w[i - 2] >>> 10);
-            w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
-        }
-        let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
-        for (let i = 0; i < 64; i++) {
-            const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
-            const ch = (e & f) ^ (~e & g);
-            const t1 = (h + S1 + ch + _sha256KMain1[i] + w[i]) | 0;
-            const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
-            const maj = (a & b) ^ (a & c) ^ (b & c);
-            const t2 = (S0 + maj) | 0;
-            h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
-        }
-        h0 = (h0 + a) | 0; h1 = (h1 + b) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0;
-        h4 = (h4 + e) | 0; h5 = (h5 + f) | 0; h6 = (h6 + g) | 0; h7 = (h7 + h) | 0;
-    }
-    const out = new Uint32Array([h0, h1, h2, h3, h4, h5, h6, h7]);
-    let hex = "";
-    for (let i = 0; i < 8; i++) {
-        const v = out[i];
-        hex += ((v >>> 28) & 0xf).toString(16) + ((v >>> 24) & 0xf).toString(16) +
-            ((v >>> 20) & 0xf).toString(16) + ((v >>> 16) & 0xf).toString(16) +
-            ((v >>> 12) & 0xf).toString(16) + ((v >>> 8) & 0xf).toString(16) +
-            ((v >>> 4) & 0xf).toString(16) + (v & 0xf).toString(16);
-    }
-    return hex;
-}
-
-async function solvePowChallengeMain1(challenge) {
-    const need = "0".repeat(challenge.difficulty);
-    const prefix = challenge.prefix;
-    let nonce = 0;
-    return new Promise((resolve) => {
-        function step() {
-            const t0 = performance.now();
-            while (performance.now() - t0 < 14) {
-                if (sha256HexMain1(prefix + nonce).startsWith(need)) {
-                    resolve(nonce);
-                    return;
-                }
-                nonce++;
-                if (nonce % 1500 === 0) setConnectingUI("Проверка безопасности…", 15 + Math.min(55, nonce / 200));
-            }
-            requestAnimationFrame(step);
-        }
-        requestAnimationFrame(step);
-    });
-}
-
-async function runPowVerificationMain1() {
-    setConnectingUI("Запрос проверки…", 12);
-    const res = await fetch(POW_API_BASE + "/challenge", { cache: "no-store" });
-    if (!res.ok) throw new Error("challenge failed");
-    const challenge = await res.json();
-    setConnectingUI("Проверка безопасности…", 25);
-    const nonce = await solvePowChallengeMain1(challenge);
-    setConnectingUI("Подтверждение…", 65);
-    const verifyRes = await fetch(POW_API_BASE + "/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ challengeId: challenge.challengeId, nonce: String(nonce) })
-    });
-    if (!verifyRes.ok) throw new Error("verify failed");
-    console.info("[pow] OK — api.agar.su:6005, можно подключаться к gameserver");
 }
 
 class Game {
@@ -196,8 +99,6 @@ class Game {
         window.setNick = this.setNick.bind(this);
         window.setSpect = this.setSpect.bind(this);
         window.setServer = this.setServer.bind(this);
-        window.runPow = this.runPow.bind(this);
-        window.playConnect = this.playConnect.bind(this);
         window.setSkins = (arg) => { this.showSkin = !arg; }; // "No skins" checkbox: checked means hide skins
         window.setNames = (arg) => { this.showName = arg; }; // "No names"
         window.setDarkTheme = (arg) => { this.showDarkTheme = arg; };
@@ -313,35 +214,35 @@ getSkinForNick(nick) {
 setNick(arg) {
     this.userNickName = arg + "#";
     this.hideOverlays();
-    const select = document.getElementById("gamemode");
-    const newHost = select && select.value;
-    const serverChanged = newHost && newHost !== this.CONNECTION_URL;
-    if (newHost) this.setServer(newHost);
-    if (!this.connectShown || serverChanged) {
+    if (!this.connectShown) {
+        this.showConnecting();
         this.connectShown = true;
-        this.playConnect();
-    } else if (this.wsIsOpen()) {
-        this.sendNickName();
+    } else {
+    // Отправляем ник напрямую (без капчи)
+    this.sendNickName();
     }
     this.userScore = 0;
 }
 setSpect() {
     this.userNickName = null;
-    const select = document.getElementById("gamemode");
-    const newHost = select && select.value;
-    const serverChanged = newHost && newHost !== this.CONNECTION_URL;
-    if (newHost) this.setServer(newHost);
-    this.hideOverlays();
-    if (!this.connectShown || serverChanged) {
+    if (!this.connectShown) {
+        this.showConnecting();
         this.connectShown = true;
-        this.playConnect();
-    } else if (this.wsIsOpen()) {
+    } else {
         this.sendUint8(1);
     }
+    
+    this.hideOverlays();
 }
     setServer(arg) {
-        if (arg && arg !== this.CONNECTION_URL) {
+        if (arg !== this.CONNECTION_URL) {
             this.CONNECTION_URL = arg;
+            if (this.ma) {
+                this.hideDisconnected();
+                document.querySelector("#connecting").style.display = "block";
+                setConnectingUI("Подключение к серверу…", 5);
+                this.showConnecting();
+            }
         }
     }
 
@@ -508,7 +409,7 @@ if (select && select.value) {
         this.hideDisconnected();
         document.querySelector("#connecting").style.display = "block";
         setConnectingUI("Подключение к серверу…", 5);
-        this.playConnect();
+        this.showConnecting();
     }
     scheduleTabHiddenClose() {
         if (this.tabHiddenSince == null) {
@@ -554,91 +455,50 @@ if (select && select.value) {
         }
         this.tabHiddenSince = null;
     }
-    async runPow() {
-        console.info("[pow] →", POW_API_BASE);
-        await runPowVerificationMain1();
-    }
-
-    async showConnecting(wsUrlArg) {
-        if (!this.ma) return;
-        const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
+    showConnecting() {
+        const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
         if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentWebSocketUrl === wsUrl) {
+            console.log("Соединение уже активно для этого URL, пропускаем повторное подключение.");
             return;
         }
-        this.currentWebSocketUrl = wsUrl;
-
-        if (this.pingIntervalId != null) {
-            clearInterval(this.pingIntervalId);
-            this.pingIntervalId = null;
+        if (this.ma) {
+            this.currentWebSocketUrl = wsUrl;
+            this.wsConnect(wsUrl);
         }
+    }
+    
+    wsConnect(wsUrlArg) {
+        if (this.connectInProgress) return;
+        this.connectInProgress = true;
+        setConnectingUI("Подключение к серверу…", 5);
+
         if (this.ws) {
             this.wsClosingIntentional = true;
             this.ws.onopen = null;
             this.ws.onmessage = null;
             this.ws.onclose = null;
-            this.ws.onerror = null;
-            try { this.ws.close(); } catch (b) {}
+            try {
+                this.ws.close();
+            } catch (b) {}
             this.ws = null;
         }
+
+        const host = this.CONNECTION_URL;
+        const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + host;
         this.clearGameState();
 
-        console.info("[connect] WSS →", wsUrl);
-        setConnectingUI("Подключение к gameserver…", 90);
-        await this.connectGameserver(wsUrl);
-    }
+        const qs = new URLSearchParams();
+        const accountToken = localStorage.getItem("accountToken") || "";
+        if (accountToken) qs.set("accountToken", accountToken);
+        const query = qs.toString();
 
-    async playConnect(wsUrlArg) {
-        if (this.connectInProgress) return;
-        this.connectInProgress = true;
-        document.querySelector("#connecting").style.display = "block";
-        try {
-            await this.runPow();
-            await this.showConnecting(wsUrlArg);
-        } catch (err) {
-            console.error("Connect error:", err);
-            setConnectingUI("Ошибка подключения, повтор…", 0);
-        } finally {
-            this.connectInProgress = false;
-        }
-    }
-
-    connectGameserver(wsUrl) {
-        return new Promise((resolve, reject) => {
-            const qs = new URLSearchParams();
-            const accountToken = localStorage.getItem("accountToken") || "";
-            if (accountToken) qs.set("accountToken", accountToken);
-            const query = qs.toString();
-            console.info("Connecting to " + wsUrl + "..");
-            const socket = new WebSocket(
-                wsUrl + (query ? "?" + query : ""),
-                "eSejeKSVdysQvZs0ES1H"
-            );
-            this.ws = socket;
-            socket.binaryType = "arraybuffer";
-            let settled = false;
-            const fail = (err) => {
-                if (settled) return;
-                settled = true;
-                this.ws = null;
-                reject(err || new Error("WebSocket failed"));
-            };
-            socket.onopen = () => {
-                if (settled) return;
-                settled = true;
-                this.onWsOpen();
-                resolve();
-            };
-            socket.onmessage = this.onWsMessage.bind(this);
-            socket.onclose = (evt) => {
-                this.onWsClose(evt);
-                if (!settled) fail(new Error("WebSocket closed"));
-            };
-            socket.onerror = () => fail(new Error("WebSocket error"));
-        });
-    }
-
-    async wsConnect(wsUrlArg) {
-        await this.playConnect(wsUrlArg);
+        console.info("Connecting to " + wsUrl + "..");
+        this.ws = new WebSocket(wsUrl + (query ? "?" + query : ""), "eSejeKSVdysQvZs0ES1H");
+        this.ws.binaryType = "arraybuffer";
+        this.ws.onopen = this.onWsOpen.bind(this);
+        this.ws.onmessage = this.onWsMessage.bind(this);
+        this.ws.onclose = this.onWsClose.bind(this);
+        this.connectInProgress = false;
     }
 
 
@@ -646,7 +506,6 @@ if (select && select.value) {
         return new DataView(new ArrayBuffer(a));
     }
     wsSend(a) {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
         this.ws.send(a.buffer);
     }
     onWsOpen() {
