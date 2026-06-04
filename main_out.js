@@ -101,6 +101,7 @@ async function runPowVerificationMain1() {
         body: JSON.stringify({ challengeId: challenge.challengeId, nonce: String(nonce) })
     });
     if (!verifyRes.ok) throw new Error("verify failed");
+    console.info("[pow] OK — api.agar.su:6005, можно подключаться к gameserver");
 }
 
 class Game {
@@ -195,6 +196,8 @@ class Game {
         window.setNick = this.setNick.bind(this);
         window.setSpect = this.setSpect.bind(this);
         window.setServer = this.setServer.bind(this);
+        window.runPow = this.runPow.bind(this);
+        window.playConnect = this.playConnect.bind(this);
         window.setSkins = (arg) => { this.showSkin = !arg; }; // "No skins" checkbox: checked means hide skins
         window.setNames = (arg) => { this.showName = arg; }; // "No names"
         window.setDarkTheme = (arg) => { this.showDarkTheme = arg; };
@@ -311,39 +314,34 @@ setNick(arg) {
     this.userNickName = arg + "#";
     this.hideOverlays();
     const select = document.getElementById("gamemode");
-    if (select && select.value) this.setServer(select.value);
-    if (!this.connectShown) {
-        this.showConnecting();
+    const newHost = select && select.value;
+    const serverChanged = newHost && newHost !== this.CONNECTION_URL;
+    if (newHost) this.setServer(newHost);
+    if (!this.connectShown || serverChanged) {
         this.connectShown = true;
-    } else {
-    // Отправляем ник напрямую (без капчи)
-    this.sendNickName();
+        this.playConnect();
+    } else if (this.wsIsOpen()) {
+        this.sendNickName();
     }
     this.userScore = 0;
 }
 setSpect() {
     this.userNickName = null;
     const select = document.getElementById("gamemode");
-    if (select && select.value) this.setServer(select.value);
-    if (!this.connectShown) {
-        this.showConnecting();
+    const newHost = select && select.value;
+    const serverChanged = newHost && newHost !== this.CONNECTION_URL;
+    if (newHost) this.setServer(newHost);
+    this.hideOverlays();
+    if (!this.connectShown || serverChanged) {
         this.connectShown = true;
-    } else {
+        this.playConnect();
+    } else if (this.wsIsOpen()) {
         this.sendUint8(1);
     }
-    
-    this.hideOverlays();
 }
     setServer(arg) {
         if (arg && arg !== this.CONNECTION_URL) {
             this.CONNECTION_URL = arg;
-            if (this.ma) {
-                this.hideDisconnected();
-                const box = document.querySelector("#connecting");
-                if (box) box.style.display = "block";
-                setConnectingUI("Подключение к серверу…", 5);
-                this.showConnecting();
-            }
         }
     }
 
@@ -510,7 +508,7 @@ if (select && select.value) {
         this.hideDisconnected();
         document.querySelector("#connecting").style.display = "block";
         setConnectingUI("Подключение к серверу…", 5);
-        this.showConnecting();
+        this.playConnect();
     }
     scheduleTabHiddenClose() {
         if (this.tabHiddenSince == null) {
@@ -556,14 +554,51 @@ if (select && select.value) {
         }
         this.tabHiddenSince = null;
     }
-    showConnecting() {
-        const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
+    async runPow() {
+        console.info("[pow] →", POW_API_BASE);
+        await runPowVerificationMain1();
+    }
+
+    async showConnecting(wsUrlArg) {
+        if (!this.ma) return;
+        const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
         if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentWebSocketUrl === wsUrl) {
             return;
         }
-        if (this.ma) {
-            this.currentWebSocketUrl = wsUrl;
-            this.joinServer(wsUrl);
+        this.currentWebSocketUrl = wsUrl;
+
+        if (this.pingIntervalId != null) {
+            clearInterval(this.pingIntervalId);
+            this.pingIntervalId = null;
+        }
+        if (this.ws) {
+            this.wsClosingIntentional = true;
+            this.ws.onopen = null;
+            this.ws.onmessage = null;
+            this.ws.onclose = null;
+            this.ws.onerror = null;
+            try { this.ws.close(); } catch (b) {}
+            this.ws = null;
+        }
+        this.clearGameState();
+
+        console.info("[connect] WSS →", wsUrl);
+        setConnectingUI("Подключение к gameserver…", 90);
+        await this.connectGameserver(wsUrl);
+    }
+
+    async playConnect(wsUrlArg) {
+        if (this.connectInProgress) return;
+        this.connectInProgress = true;
+        document.querySelector("#connecting").style.display = "block";
+        try {
+            await this.runPow();
+            await this.showConnecting(wsUrlArg);
+        } catch (err) {
+            console.error("Connect error:", err);
+            setConnectingUI("Ошибка подключения, повтор…", 0);
+        } finally {
+            this.connectInProgress = false;
         }
     }
 
@@ -602,44 +637,8 @@ if (select && select.value) {
         });
     }
 
-    async joinServer(wsUrlArg) {
-        if (this.connectInProgress) return;
-        this.connectInProgress = true;
-        document.querySelector("#connecting").style.display = "block";
-
-        if (this.pingIntervalId != null) {
-            clearInterval(this.pingIntervalId);
-            this.pingIntervalId = null;
-        }
-
-        if (this.ws) {
-            this.wsClosingIntentional = true;
-            this.ws.onopen = null;
-            this.ws.onmessage = null;
-            this.ws.onclose = null;
-            this.ws.onerror = null;
-            try { this.ws.close(); } catch (b) {}
-            this.ws = null;
-        }
-
-        const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
-        this.clearGameState();
-
-        try {
-            await runPowVerificationMain1();
-            setConnectingUI("Подключение к gameserver…", 90);
-            await this.connectGameserver(wsUrl);
-        } catch (err) {
-            console.error("Connect error:", err);
-            setConnectingUI("Ошибка подключения, повтор…", 0);
-            return;
-        } finally {
-            this.connectInProgress = false;
-        }
-    }
-
     async wsConnect(wsUrlArg) {
-        await this.joinServer(wsUrlArg);
+        await this.playConnect(wsUrlArg);
     }
 
 
