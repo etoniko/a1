@@ -337,6 +337,13 @@ setSpect() {
     setServer(arg) {
         if (arg && arg !== this.CONNECTION_URL) {
             this.CONNECTION_URL = arg;
+            if (this.ma) {
+                this.hideDisconnected();
+                const box = document.querySelector("#connecting");
+                if (box) box.style.display = "block";
+                setConnectingUI("Подключение к серверу…", 5);
+                this.showConnecting();
+            }
         }
     }
 
