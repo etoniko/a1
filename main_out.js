@@ -1,9 +1,4 @@
-function getConnectApiBase(host) {
-    if (!host) return "https://reg.agar.su";
-    if (/^https?:\/\//i.test(host)) return String(host).replace(/\/$/, "");
-    const h = String(host).replace(/^wss?:\/\//i, "");
-    return "https://" + h;
-}
+const POW_API_BASE = "https://api.agar.su:6005";
 
 function setConnectingUI(text, pct) {
     const box = document.querySelector("#connecting");
@@ -14,7 +9,7 @@ function setConnectingUI(text, pct) {
     if (bar && pct != null) bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
 }
 
-const _sha256K = new Uint32Array([
+const _sha256KMain1 = new Uint32Array([
     0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
     0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
     0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
@@ -25,7 +20,7 @@ const _sha256K = new Uint32Array([
     0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
 ]);
 
-function sha256HexConnectSync(text) {
+function sha256HexMain1(text) {
     const enc = new TextEncoder().encode(String(text));
     const len = enc.length;
     const bitLen = len * 8;
@@ -49,7 +44,7 @@ function sha256HexConnectSync(text) {
         for (let i = 0; i < 64; i++) {
             const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
             const ch = (e & f) ^ (~e & g);
-            const t1 = (h + S1 + ch + _sha256K[i] + w[i]) | 0;
+            const t1 = (h + S1 + ch + _sha256KMain1[i] + w[i]) | 0;
             const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
             const maj = (a & b) ^ (a & c) ^ (b & c);
             const t2 = (S0 + maj) | 0;
@@ -63,14 +58,14 @@ function sha256HexConnectSync(text) {
     for (let i = 0; i < 8; i++) {
         const v = out[i];
         hex += ((v >>> 28) & 0xf).toString(16) + ((v >>> 24) & 0xf).toString(16) +
-               ((v >>> 20) & 0xf).toString(16) + ((v >>> 16) & 0xf).toString(16) +
-               ((v >>> 12) & 0xf).toString(16) + ((v >>> 8) & 0xf).toString(16) +
-               ((v >>> 4) & 0xf).toString(16) + (v & 0xf).toString(16);
+            ((v >>> 20) & 0xf).toString(16) + ((v >>> 16) & 0xf).toString(16) +
+            ((v >>> 12) & 0xf).toString(16) + ((v >>> 8) & 0xf).toString(16) +
+            ((v >>> 4) & 0xf).toString(16) + (v & 0xf).toString(16);
     }
     return hex;
 }
 
-function solveConnectChallenge(challenge) {
+async function solvePowChallengeMain1(challenge) {
     const need = "0".repeat(challenge.difficulty);
     const prefix = challenge.prefix;
     let nonce = 0;
@@ -78,14 +73,12 @@ function solveConnectChallenge(challenge) {
         function step() {
             const t0 = performance.now();
             while (performance.now() - t0 < 14) {
-                if (sha256HexConnectSync(prefix + nonce).startsWith(need)) {
-                    resolve(`${challenge.challengeId}:${nonce}`);
+                if (sha256HexMain1(prefix + nonce).startsWith(need)) {
+                    resolve(nonce);
                     return;
                 }
                 nonce++;
-                if (nonce % 2000 === 0) {
-                    setConnectingUI("Проверка безопасности…", 15 + Math.min(50, nonce / 200));
-                }
+                if (nonce % 1500 === 0) setConnectingUI("Проверка безопасности…", 15 + Math.min(55, nonce / 200));
             }
             requestAnimationFrame(step);
         }
@@ -93,15 +86,21 @@ function solveConnectChallenge(challenge) {
     });
 }
 
-async function fetchConnectToken(gameHost) {
+async function runPowVerificationMain1() {
     setConnectingUI("Запрос проверки…", 12);
-    const res = await fetch(getConnectApiBase(gameHost) + "/challenge", { cache: "no-store" });
-    if (!res.ok) throw new Error("challenge request failed");
+    const res = await fetch(POW_API_BASE + "/challenge", { cache: "no-store" });
+    if (!res.ok) throw new Error("challenge failed");
     const challenge = await res.json();
-    setConnectingUI("Вычисление ответа…", 28);
-    const token = await solveConnectChallenge(challenge);
-    setConnectingUI("Подключение к серверу…", 72);
-    return token;
+    setConnectingUI("Проверка безопасности…", 25);
+    const nonce = await solvePowChallengeMain1(challenge);
+    setConnectingUI("Подтверждение…", 65);
+    const verifyRes = await fetch(POW_API_BASE + "/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ challengeId: challenge.challengeId, nonce: String(nonce) })
+    });
+    if (!verifyRes.ok) throw new Error("verify failed");
 }
 
 class Game {
@@ -117,7 +116,7 @@ class Game {
         this.pingIntervalId = null;
         this.tabHiddenCloseTimer = null;
         this.tabHiddenSince = null;
-        this.tabHiddenCloseSec = 60;
+        this.tabHiddenCloseSec = 600;
         this.disconnectedVisible = false;
         this.useHttps = location.protocol === "https:";
         // Canvas и отрисовка
@@ -311,6 +310,8 @@ getSkinForNick(nick) {
 setNick(arg) {
     this.userNickName = arg + "#";
     this.hideOverlays();
+    const select = document.getElementById("gamemode");
+    if (select && select.value) this.setServer(select.value);
     if (!this.connectShown) {
         this.showConnecting();
         this.connectShown = true;
@@ -322,6 +323,8 @@ setNick(arg) {
 }
 setSpect() {
     this.userNickName = null;
+    const select = document.getElementById("gamemode");
+    if (select && select.value) this.setServer(select.value);
     if (!this.connectShown) {
         this.showConnecting();
         this.connectShown = true;
@@ -332,14 +335,8 @@ setSpect() {
     this.hideOverlays();
 }
     setServer(arg) {
-        if (arg !== this.CONNECTION_URL) {
+        if (arg && arg !== this.CONNECTION_URL) {
             this.CONNECTION_URL = arg;
-            if (this.ma) {
-                this.hideDisconnected();
-                document.querySelector("#connecting").style.display = "block";
-                setConnectingUI("Подключение к серверу…", 5);
-                this.showConnecting();
-            }
         }
     }
 
@@ -555,56 +552,60 @@ if (select && select.value) {
     showConnecting() {
         const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
         if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentWebSocketUrl === wsUrl) {
-            console.log("Соединение уже активно для этого URL, пропускаем повторное подключение.");
             return;
         }
         if (this.ma) {
             this.currentWebSocketUrl = wsUrl;
-            this.wsConnect(wsUrl);
+            this.joinServer(wsUrl);
         }
     }
-    
-    async wsConnect(wsUrlArg) {
+
+    connectGameserver(wsUrl) {
+        const qs = new URLSearchParams();
+        const accountToken = localStorage.getItem("accountToken") || "";
+        if (accountToken) qs.set("accountToken", accountToken);
+        const query = qs.toString();
+        console.info("Connecting to " + wsUrl + "..");
+        this.ws = new WebSocket(wsUrl + (query ? "?" + query : ""), "eSejeKSVdysQvZs0ES1H");
+        this.ws.binaryType = "arraybuffer";
+        this.ws.onopen = this.onWsOpen.bind(this);
+        this.ws.onmessage = this.onWsMessage.bind(this);
+        this.ws.onclose = this.onWsClose.bind(this);
+    }
+
+    async joinServer(wsUrlArg) {
         if (this.connectInProgress) return;
         this.connectInProgress = true;
-        setConnectingUI("Подключение к серверу…", 5);
+        document.querySelector("#connecting").style.display = "block";
 
         if (this.ws) {
             this.wsClosingIntentional = true;
             this.ws.onopen = null;
             this.ws.onmessage = null;
             this.ws.onclose = null;
-            try {
-                this.ws.close();
-            } catch (b) {}
+            try { this.ws.close(); } catch (b) {}
             this.ws = null;
         }
 
-        const host = this.CONNECTION_URL;
-        const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + host;
+        const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
         this.clearGameState();
 
-        let connectToken = "";
         try {
-            connectToken = await fetchConnectToken(host);
+            await runPowVerificationMain1();
         } catch (err) {
-            console.error("Connect token error:", err);
+            console.error("PoW error:", err);
             this.connectInProgress = false;
+            setConnectingUI("Ошибка проверки, повтор…", 0);
             return;
         }
 
-        const qs = new URLSearchParams();
-        const accountToken = localStorage.getItem("accountToken") || "";
-        if (accountToken) qs.set("accountToken", accountToken);
-        qs.set("connectToken", connectToken);
-
-        console.info("Connecting to " + wsUrl + "..");
-        this.ws = new WebSocket(wsUrl + "?" + qs.toString(), "eSejeKSVdysQvZs0ES1H");
-        this.ws.binaryType = "arraybuffer";
-        this.ws.onopen = this.onWsOpen.bind(this);
-        this.ws.onmessage = this.onWsMessage.bind(this);
-        this.ws.onclose = this.onWsClose.bind(this);
+        setConnectingUI("Подключение к gameserver…", 90);
+        this.connectGameserver(wsUrl);
         this.connectInProgress = false;
+    }
+
+    async wsConnect(wsUrlArg) {
+        await this.joinServer(wsUrlArg);
     }
 
 
