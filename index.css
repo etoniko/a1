@@ -162,6 +162,15 @@ body {
     color: #666;
     margin: 0;
 }
+.connect-verify-data-stream {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 11px;
+    color: #337ab7;
+    margin: 0 0 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 #nick {
     width: 100%;
