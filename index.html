@@ -1,224 +1,391 @@
 <html>
 <head>
-     <title>Агарио</title>
+     <title>Agar.io</title>
     <meta name="description" content="Агарио - шарики онлайн, лучшая Агарио игра в браузере. Никаких скачиваний, просто начните играть в Агарио прямо сейчас!">
 	<meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="keywords" content="агарио, agario, agar, io, cell, cells, virus, bacteria, blob, game, games, web game, html5, fun, flash">
     <meta name="robots" content="index, follow">
     <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="yandex-verification" content="d2648e3bc2d73129" />
 	<link rel="canonical" href="https://агарио.рф">
-    <link id="favicon" rel="icon" type="image/png" href="ico.png" />
-    <link href="./index.css?2" rel="stylesheet">
-	<link href="./bootstrap.min.css" rel="stylesheet">
-    <script src="./main_out.js?18"></script>
-	<script src="https://agar.su/assets/scripts/pass.js?0.0.2" defer></script>
-	<!-- Yandex.Metrika counter -->
-<script type="text/javascript" >
-   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-   m[i].l=1*new Date();
-   for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
-   k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
-   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
-
-   ym(103054313, "init", {
-        clickmap:true,
-        trackLinks:true,
-        accurateTrackBounce:true
-   });
-</script>
+    <link rel="preload" href="https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf" as="font" type="font/ttf" crossorigin>
+    <link href="./index.css" rel="stylesheet">
+    <script src="./main_out.js"></script>
+    <link id="favicon" rel="icon" type="image/png" href="favicon.png">
 	<!-- Yandex.RTB -->
 <script>window.yaContextCb=window.yaContextCb||[]</script>
 <script src="https://yandex.ru/ads/system/context.js" async></script>
 <script>
 window.yaContextCb.push(() => {
-	
     Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-4",
-    "type": "fullscreen",
-        "platform": "touch"
-    });
-	
-    // левый 300x600
-    Ya.Context.AdvManager.render({
-        blockId: "R-A-17463228-6",
-        renderTo: "yandex_rtb_R-A-17463228-6"
-    });
-
-    // правый 300x600
-    Ya.Context.AdvManager.render({
-        blockId: "R-A-17463228-7",
-        renderTo: "yandex_rtb_R-A-17463228-7"
-    });
-
-    // верх 970x250
-    Ya.Context.AdvManager.render({
-        blockId: "R-A-17463228-8",
-        renderTo: "yandex_rtb_R-A-17463228-8"
-    });
-
-    // низ 970x250
-    Ya.Context.AdvManager.render({
-        blockId: "R-A-17463228-9",
-        renderTo: "yandex_rtb_R-A-17463228-9"
-    });
-
-});
+        "blockId": "R-A-17463228-9",
+        "renderTo": "yandex_rtb_R-A-17463228-9"
+    })
+})
 </script>
 </head>
-
 <body>
-    <div id="overlays">
-    <!-- Боковые -->
-    <div id="ad1"><div id="yandex_rtb_R-A-17463228-6"></div></div>
-    <div id="ad2"><div id="yandex_rtb_R-A-17463228-7"></div></div>
-    <!-- Верх -->
-    <div id="adTop"><div id="yandex_rtb_R-A-17463228-8"></div></div>
-    <!-- Низ -->
-    <div id="adBottom"><div id="yandex_rtb_R-A-17463228-9"></div></div>
-        <div id="helloDialog">
-                <div class="form-group">
-                    <h2 id="title" data-en="Matheus Valadares 👋🏿">Матеус Валадарес 👋🏻</h2>
-                </div>
-
-                <div class="form-group" style="display: flex;">
-                    <input id="nick" type="username" placeholder="Ник" data-en-placeholder="Nick" maxlength="16">
-					<input id="pass" type="password" placeholder="Пароль" data-en-placeholder="Pass" maxlength="8">
-                    <select id="gamemode" class="form-control" onchange="setServer(this.value)" required>
-						<option value="ffa.agar.su">FFA - Moscow</option>
-						<option value="ffa.agar.su:6002">MegaSplit#1</option>
-						<option value="ffa.agar.su:6004">pvp1</option>
-						<option value="ffa.agar.su:6005">pvp2</option>
-                    </select>
-                    <br clear="both" />
-                </div>
-
-                <div class="form-group">
-<button type="submit" id="play-btn" onclick="setNick(document.getElementById('nick').value +'#' + document.getElementById('pass').value); return false;" class="btn btn-play btn-primary btn-needs-server" data-en="Play">Играть</button>
-                    <button onclick="
-    var s = document.getElementById('settings');
-    var i = document.getElementById('instructions');
-    if (s.style.display === 'none' || s.style.display === '') {
-        s.style.display = 'block';
-        i.style.display = 'none';
-    } else {
-        s.style.display = 'none';
-        i.style.display = 'block';
-    }"
-    class="btn btn-info btn-settings" 
-    id="settings-btn">
-⚙️
-</button>
-                    <br clear="both" />
-                </div>
-
-                <div id="settings" class="checkbox" style="display:none;">
-                    <div class="form-group" id="mainform">
-<button type="button" id="spectate-btn" onclick="setSpect(); return false;" style="width: 100%" class="btn btn-warning btn-spectate btn-needs-server" data-en="Spectate">Наблюдение</button>
-                        <br clear="both" />
+<header id="mainui-header">
+    <div class="tosBox right">
+        <a class="text-muted" href="privacy.html" target="_blank" rel="noopener">Политика конфиденциальности</a>
+        <span class="tos-sep">|</span>
+        <a class="text-muted" href="offer.html" target="_blank" rel="noopener">Оферта</a>
+        <span class="tos-sep">|</span>
+        <a class="text-muted" href="rules.html" target="_blank" rel="noopener">Правила</a>
+    </div>
+</header>
+<div id="background"></div>
+<div id="overlays">
+    <div id="helloDialog">
+        <div id="mainui-grid">
+            <div>
+                <div id="mainui-user">
+                    <div class="user-container">
+                        <img class="user-picture" src="./img/profilepic_guest.png" alt="">
+                        <div id="dnaWallet" class="currency-container">
+                            <span class="label">0</span>
+                            <span class="icon sprite-main dna-small-icon"></span>
+                            <div class="plus"><span>+</span></div>
+                        </div>
+                        <div id="coinWallet" class="currency-container">
+                            <span class="label">0</span>
+                            <span class="icon sprite-main currency-icon"></span>
+                            <div class="plus"><span>+</span></div>
+                        </div>
+                        <div class="user-name">Гость</div>
+                        <div id="progressBar">
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" style="width:0%"></div>
+                                <span class="progress-bar-text">0/100 XP</span>
+                            </div>
+                            <div class="progress-bar-star sprite xpboost-main"><span>1</span></div>
+                        </div>
+                        <div id="xpButton" class="boost-button">
+                            <span class="boost-image sprite-main xpboost-3x-shop"></span>
+                            <div class="circle green boost-counter"><span>+</span></div>
+                        </div>
+                        <div id="massButton" class="boost-button">
+                            <span class="boost-image sprite-main massboost-3x-shop"></span>
+                            <div class="circle green boost-counter"><span>+</span></div>
+                        </div>
                     </div>
-<div style="margin: 6px;">
-    <label>
-        <input type="checkbox" class="save" data-box-id="1" onchange="setSkins(this.checked);" data-en="No skins">Без скинов
-    </label>
-    <label>
-        <input type="checkbox" class="save" data-box-id="2" onchange="setNames(!this.checked);" data-en="No names">Без ников
-    </label>
-    <label>
-        <input type="checkbox" class="save" data-box-id="3" onchange="setDarkTheme(this.checked);" data-en="Dark Theme">Тёмная тема
-    </label>
-    <label>
-        <input type="checkbox" class="save" data-box-id="5" onchange="setShowMass(this.checked);" data-en="Show mass" checked>Показывать массу
-    </label>
-    <label>
-        <input type="checkbox" class="save" data-box-id="7" onchange="setChatHide(this.checked);" data-en="Close chat">Закрыть чат
-    </label>
-<div>
-    <label>
-        Speed: <b id="speedLabel">2 (Normal)</b>
-    </label>
-
-    <input 
-        type="range"
-        id="speedSlider"
-        min="1"
-        max="3"
-        step="1"
-        value="2"
-        oninput="setSpeedStage(this.value)"
-        style="width:100%;"
-    >
-
-    <div style="display:flex; justify-content:space-between; font-size:12px;">
-        <span>1</span>
-        <span>2</span>
-        <span>3</span>
-    </div>
-</div>
-
-
-
-</div>
                 </div>
-
-            <div id="instructions">
-                <hr/>
-<a href="https://agar.su/account/" target="_blank">
-    <img src="agar-nick.png" alt="AGAR.SU" style="width: 100%;height:auto;">
-</a>
+                <div id="mainui-offers">
+                    <div class="offers-container">
+                        <div class="title">Offers</div>
+                        <div class="button-container">
+                            <div class="free-coins-button">
+                                <button type="button" id="freeCoins">
+                                    <span class="sprite-main Coins-S"></span>
+                                    <span>Free Coins</span>
+                                </button>
+                            </div>
+                            <div class="promo-badge-container">
+                                <div class="coin-shop">
+                                    <button type="button" id="coinShop">
+                                        <span class="sprite-main Coins-S"></span>
+                                        <span>Coins</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="mainui-features">
+                    <div class="features-container">
+                        <div class="buttons-container">
+                            <div class="feature-button shop">
+                                <span class="label">Shop</span>
+                                <span class="sprite-main Icon-Store"></span>
+                            </div>
+                            <div class="feature-button leaderboards">
+                                <span class="label">Leaderboards</span>
+                                <span class="sprite-main Icon-Leaderboards"></span>
+                            </div>
+                            <div class="feature-button quests">
+                                <span class="label">Daily Quests</span>
+                                <span class="sprite-main Icon-DailyQuests"></span>
+                            </div>
+                            <div class="feature-button gifting">
+                                <span class="label">Gifts</span>
+                                <span class="sprite-main Icon-Gifting"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="potions-container">
+                        <div id="potion-slot" class="mini left">
+                            <div class="potion-slot-wraper">
+                                <div class="potion-slot-container">
+                                    <div class="potion-slot-shape grey">Empty</div>
+                                    <div class="potion-slot-middle-text">Empty Slot</div>
+                                </div>
+                                <div class="btn potion-slot-button green"><span class="label">Get Potions</span></div>
+                            </div>
+                        </div>
+                        <div id="potion-slot" class="mini middle">
+                            <div class="potion-slot-wraper">
+                                <div class="potion-slot-container">
+                                    <div class="potion-slot-shape grey">Empty</div>
+                                    <div class="potion-slot-middle-text">Empty Slot</div>
+                                </div>
+                                <div class="btn potion-slot-button green"><span class="label">Get Potions</span></div>
+                            </div>
+                        </div>
+                        <div id="potion-slot" class="mini right">
+                            <div class="potion-slot-wraper">
+                                <div class="potion-slot-container">
+                                    <div class="potion-slot-shape grey">Empty</div>
+                                    <div class="potion-slot-middle-text">Empty Slot</div>
+                                </div>
+                                <div class="btn potion-slot-button green"><span class="label">Get Potions</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="help-button"><span class="hint-button sprite-main"></span></div>
+                </div>
             </div>
-
-            <hr />
-            <div id="footer">
-                <a target="_blank" href="https://t.me/agarsu" class="text-muted">Telegram: @agarsu</a>
+            <div>
+                <div id="mainui-play">
+                    <div class="play-container">
+                        <div id="mainPanel" class="agario-panel">
+                            <button type="button" class="btn sprite-main cog" id="settingsButton"></button>
+                            <div id="socialButtons"></div>
+                            <div id="title" class="guest">Agar.su</div>
+                            <div id="playnick">
+                                <div class="playnick-row">
+                                    <div class="circle" id="skinButton">
+                                        <div id="skinLabel">Skins</div>
+                                        <div class="circle bordered skinWrapper"></div>
+                                        <div class="circle tiny green"><span class="plus-text">+</span></div>
+                                    </div>
+                                    <div class="playnick-inputs">
+                                        <input id="nick" type="text" placeholder="Nick" maxlength="16">
+                                        <input id="pass" type="password" placeholder="Pass" maxlength="8">
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-play" id="play" onclick="setNick(document.getElementById('nick').value + '#' + document.getElementById('pass').value); return false;">Play</button>
+                            </div>
+                            <div id="instructions" class="guest">
+                                <span class="text-muted">
+                                    <span>Move your mouse to control your cell</span><br>
+                                    <span>Press <b>Space</b> to split</span><br>
+                                    <span>Press <b>W</b> to eject some mass</span>
+                                </span>
+                            </div>
+                            <div id="mainui-settings" style="display:none;">
+                                <div class="disabler" onclick="closeSettings()"></div>
+                                <div class="dialog">
+                                    <span class="leagues-inner-close sprite-main Close" onclick="closeSettings()"></span>
+                                    <div>
+                                        <select id="quality" class="form-control" required>
+                                            <option disabled selected>Graphics</option>
+                                            <option value="Retina" selected>Retina</option>
+                                            <option value="High">High</option>
+                                            <option value="Medium">Medium</option>
+                                            <option value="Low">Low</option>
+                                            <option value="VeryLow">Very Low</option>
+                                        </select>
+                                    </div>
+                                    <div class="options">
+                                        <div class="checkbox checkbox-info checkbox-circle option">
+                                            <input type="checkbox" class="styled" id="noSkins" onchange="setSkins(this.checked)">
+                                            <label for="noSkins">No skins</label>
+                                        </div>
+                                        <div class="checkbox checkbox-info checkbox-circle option">
+                                            <input type="checkbox" class="styled" id="noNames" onchange="setNames(!this.checked)">
+                                            <label for="noNames">No names</label>
+                                        </div>
+                                        <div class="checkbox checkbox-info checkbox-circle option">
+                                            <input type="checkbox" class="styled" id="darkTheme" onchange="setDarkTheme(this.checked)">
+                                            <label for="darkTheme">Dark theme</label>
+                                        </div>
+                                        <div class="checkbox checkbox-info checkbox-circle option">
+                                            <input type="checkbox" class="styled" id="showMass" onchange="setShowMass(this.checked)" checked>
+                                            <label for="showMass">Show mass</label>
+                                        </div>
+                                        <div class="checkbox checkbox-info checkbox-circle option">
+                                            <input type="checkbox" class="styled" id="hideChat" onchange="setChatHide(this.checked)">
+                                            <label for="hideChat">Hide chat</label>
+                                        </div>
+                                        <div class="option option-speed">
+                                            <label>Speed: <b id="speedLabel">2 (Normal)</b></label>
+                                            <input type="range" id="speedSlider" min="1" max="3" step="1" value="2" oninput="setSpeedStage(this.value)" class="speed-range">
+                                            <div class="speed-marks"><span>1</span><span>2</span><span>3</span></div>
+                                        </div>
+                                    </div>
+                                    <div class="actions">
+                                        <button type="button" class="btn btn-warning btn-spectate" id="spectate-btn" onclick="setSpect(); return false;">Spectate</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="mainui-ads">
+                    <div id="yandex_rtb_R-A-17463228-9"></div>
+                </div>
             </div>
-<footer id="footer"><a target="_blank" href="https://agar.su/privacy.html" data-en="privacy">политика</a><a target="_blank" href="https://agar.su/rules.html" data-en="rules"> · правила · </a><a target="_blank" href="https://agar.su/offer.html" data-en="offer">оферта</a></footer>
+            <div>
+                <div id="mainui-modes">
+                    <div class="modes-container">
+                        <h4 class="title">Выберите режим игры</h4>
+                        <div class="gamemodes">
+                            <div id="mode_ffa" class="item active ffa" data-server="ffa" onclick="setServer('ffa')"><span class="label">FFA</span></div>
+                            <div id="mode_ff2" class="item experimental" data-server="ff2" onclick="setServer('ff2')"><span class="label">FFA #2</span></div>
+                            <div id="mode_ms" class="item teams" data-server="ms" onclick="setServer('ms')"><span class="label">MegaSplit</span></div>
+                            <div id="mode_pvp1" class="item battleroyale" data-server="pvp1" onclick="setServer('pvp1')"><span class="label">PvP</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="mainui-party">
+                    <div class="agario-party">
+                        <span class="sprite-main partymode-menu-icon"></span>
+                        <h4 class="party-title"><span class="party-title">Tournament</span></h4>
+                        <div class="party-text">Для сильнейших игроков (актив c 20:00)</div>
+                        <div class="clearfix">
+                            <button type="button" class="btn btn-primary btn-party party-join" data-server="tournament" onclick="setServer('tournament')">Вступить</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="mainui-promo">
+                    <div id="mcbanners">
+                        <div class="agario-promo-container">
+                            <div class="agario-promo">
+                                <img src="./img/Banner_LoggedOut_325x290.png" alt="">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+</div>
 
-    <div id="connecting">
-        <div class="connecting-box">
-            <h2 data-en="Connecting">Подключение</h2>
-            <p id="connect-status">Проверка и подключение к серверу…</p>
-            <div class="connect-verify-data-stream" id="connect-verify-data-stream">sha256("…") → …</div>
-            <div class="connect-progress-wrap"><div id="connect-progress"></div></div>
-            <p class="connect-hint" data-en="If you cannot connect to servers, send message telegram">Если не удаётся подключиться — напишите в телеграм</p>
-        </div>
+<div id="connecting">
+    <div class="connecting-box">
+        <h2>Подключение</h2>
+        <p id="connect-status">Проверка и подключение к серверу…</p>
+        <div class="connect-verify-data-stream" id="connect-verify-data-stream">sha256("…") → …</div>
+        <div class="connect-progress-wrap"><div id="connect-progress"></div></div>
     </div>
+</div>
 
-    <div id="disconnected">
-        <div class="connecting-box">
-            <h2 data-en="Connection lost">Соединение потеряно</h2>
-            <p id="disconnect-status" data-en="Network disconnected. Check your internet and press Reconnect.">Обрыв сети. Проверьте интернет и нажмите «Переподключиться».</p>
-            <button type="button" id="reconnect-btn" class="btn btn-play btn-primary btn-needs-server" data-en="Reconnect">Переподключиться</button>
-        </div>
+<div id="disconnected">
+    <div class="connecting-box">
+        <h2>Соединение потеряно</h2>
+        <p id="disconnect-status">Обрыв сети. Проверьте интернет и нажмите «Переподключиться».</p>
+        <button type="button" id="reconnect-btn" class="btn btn-play btn-primary btn-needs-server">Переподключиться</button>
     </div>
+</div>
 
-    <canvas id="canvas"></canvas>
-    <input type="text" id="chat_textbox" placeholder="Нажмите Enter для чата" data-en-placeholder="Press Enter to chat" maxlength="200"/>
-	<script>
-(function () {
+<canvas id="canvas"></canvas>
+<input type="text" id="chat_textbox" placeholder="Press enter to chat" maxlength="120">
+<script>
+function openSettings() {
+    document.getElementById('mainui-settings').style.display = 'block';
+    document.getElementById('mainui-play').classList.add('moveToTop');
+}
+function closeSettings() {
+    document.getElementById('mainui-settings').style.display = 'none';
+    document.getElementById('mainui-play').classList.remove('moveToTop');
+}
 
-    var lang = (navigator.language || navigator.userLanguage || "en").toLowerCase();
-    var isEnglish = !lang.startsWith("ru");
-    if (!isEnglish) return;
+document.addEventListener('DOMContentLoaded', () => {
+    const nickInput = document.getElementById('nick');
+    const passInput = document.getElementById('pass');
+    const settingsBtn = document.getElementById('settingsButton');
+    let allowedNicks = [];
 
-    document.querySelectorAll("[data-en]").forEach(el=>{
-        el.innerHTML = el.getAttribute("data-en");
+    settingsBtn.addEventListener('click', openSettings);
+
+    function normalizeNick(nick) {
+        if (!nick) return '';
+        let n = nick.trim();
+        const brackets = { '[': ']', '{': '}', '(': ')', '|': '|' };
+        const firstChar = n.charAt(0);
+        if (brackets[firstChar]) {
+            const closeChar = brackets[firstChar];
+            const endIndex = n.indexOf(closeChar, 1);
+            if (endIndex === -1) return '';
+            const innerNick = n.substring(1, endIndex);
+            if (!innerNick || innerNick.trim() !== innerNick) return '';
+            n = innerNick;
+        } else {
+            if (!n || n.trim() !== n) return '';
+        }
+        return n.toLowerCase();
+    }
+
+    function setCookie(name, value, days) {
+        let expires = '';
+        if (days) {
+            const date = new Date();
+            date.setTime(date.getTime() + days * 86400000);
+            expires = '; expires=' + date.toUTCString();
+        }
+        document.cookie = name + '=' + encodeURIComponent(value || '') + expires + '; path=/';
+    }
+
+    function getCookie(name) {
+        const nameEQ = name + '=';
+        for (const part of document.cookie.split(';')) {
+            const c = part.trim();
+            if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length));
+        }
+        return null;
+    }
+
+    function checkNickStatus(nick) {
+        const normalized = normalizeNick(nick);
+        const showPass = allowedNicks.includes(normalized);
+        passInput.style.display = showPass ? 'block' : 'none';
+        document.getElementById('playnick').classList.toggle('has-pass', showPass);
+        if (!showPass) passInput.value = '';
+    }
+
+    fetch('https://api.agar.su/pass.txt')
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then(data => {
+            allowedNicks = data.split('\n')
+                .map(n => normalizeNick(n))
+                .filter(n => n !== '');
+            const savedNick = getCookie('userNick');
+            const savedPass = getCookie('userPass');
+            if (savedNick) {
+                nickInput.value = savedNick;
+                checkNickStatus(savedNick);
+            }
+            if (savedPass && passInput.style.display !== 'none') {
+                passInput.value = savedPass;
+            }
+        })
+        .catch(err => console.error('Ошибка загрузки pass.txt:', err));
+
+    nickInput.addEventListener('input', () => {
+        const currentNick = nickInput.value.trim();
+        if (currentNick) setCookie('userNick', currentNick, 7);
+        else {
+            setCookie('userNick', '', -1);
+            passInput.style.display = 'none';
+            passInput.value = '';
+        }
+        checkNickStatus(currentNick);
     });
 
-    document.querySelectorAll("[data-en-placeholder]").forEach(el=>{
-        el.placeholder = el.getAttribute("data-en-placeholder");
+    passInput.addEventListener('input', () => {
+        const currentPass = passInput.value.trim();
+        if (currentPass) setCookie('userPass', currentPass, 7);
+        else setCookie('userPass', '', -1);
     });
 
-    document.querySelectorAll("[data-en-content]").forEach(el=>{
-        el.setAttribute("content", el.getAttribute("data-en-content"));
+    nickInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('play').click();
+        }
     });
-
-})();
+});
 </script>
 </body>
 </html>

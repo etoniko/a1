@@ -1,0 +1,575 @@
+#helloDialog {
+    display: block;
+    position: absolute;
+    width: 985px;
+    height: 600px;
+    top: 45%;
+    left: 50%;
+    z-index: 0;
+    color: #343434;
+    transform: translate(-50%, -50%);
+}
+
+/* Typography — Ubuntu Regular default, Bold only where agar.io sets it */
+#helloDialog,
+#helloDialog input,
+#helloDialog button,
+#helloDialog select,
+#helloDialog label {
+    font-family: 'Ubuntu', sans-serif;
+}
+
+#helloDialog {
+    font-weight: 400;
+}
+
+#helloDialog h4 {
+    font-weight: 400;
+    margin: 0;
+}
+
+#helloDialog #title {
+    font-weight: 700;
+}
+
+#helloDialog .user-name {
+    font-weight: 700;
+    color: #343434;
+}
+
+#helloDialog .offers-container > .title {
+    font-weight: 700;
+    font-size: 20.8px;
+    letter-spacing: -0.4px;
+}
+
+#helloDialog h4.party-title,
+#helloDialog .party-title {
+    font-weight: 700;
+    font-size: 20.8px;
+    margin: 14px 0 5px;
+}
+
+#helloDialog .modes-container > .title {
+    font-weight: 400;
+    font-size: 18pt;
+    margin: 5px;
+    margin-top: -5px;
+}
+
+#helloDialog .progress-bar-text {
+    font-weight: 700;
+    color: #343434;
+}
+
+#helloDialog .free-coins-button > button,
+#helloDialog .coin-shop > button,
+#helloDialog .btn-play,
+#helloDialog .btn-party,
+#helloDialog .btn {
+    font-weight: 700;
+    color: white;
+}
+
+#helloDialog .gamemodes .item > .label {
+    font-weight: 700;
+}
+
+#helloDialog .potion-slot-shape {
+    font-weight: 700;
+}
+
+#helloDialog .mini .potion-slot-middle-text {
+    font-weight: 400;
+    color: #7d7d7d;
+}
+
+#helloDialog .text-muted {
+    font-weight: 400;
+    color: #7d7d7d;
+}
+
+#helloDialog #mainui-ads .text-muted {
+    font-weight: 700;
+    font-size: 12pt;
+    color: #777;
+}
+
+#helloDialog .badge-loading {
+    font-weight: 700;
+}
+
+#helloDialog .party-text {
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 20px;
+    height: 22px;
+    color: #7d7d7d;
+}
+
+#helloDialog #instructions {
+    font-weight: 400;
+    font-size: 14.3px;
+    letter-spacing: -0.3px;
+    line-height: 1.25;
+}
+
+#helloDialog #instructions.guest {
+    font-size: 12.3px;
+}
+
+#helloDialog #instructions .text-muted {
+    font-weight: 400;
+    color: #7d7d7d;
+}
+
+#helloDialog #instructions b {
+    font-weight: 700;
+}
+
+#helloDialog .options,
+#helloDialog .options label,
+#helloDialog .checkbox label {
+    font-weight: 400;
+    color: #7d7d7d;
+}
+
+#helloDialog .feature-button > .label {
+    font-weight: 400;
+    color: #fff;
+}
+
+#helloDialog .currency-container > .label {
+    font-weight: 400;
+    color: #000;
+}
+
+#helloDialog #skinLabel {
+    font-weight: 400;
+    color: #5a5454;
+    font-size: 13px;
+}
+
+#helloDialog #nick,
+#helloDialog #pass,
+#helloDialog #quality,
+#helloDialog .form-control {
+    font-weight: 400;
+}
+
+#helloDialog .potion-slot-button > .label {
+    font-weight: 400;
+}
+
+#helloDialog .option-speed label {
+    font-weight: 400;
+    color: #7d7d7d;
+}
+
+.disabler {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background: black;
+    opacity: 0.4;
+    z-index: 1;
+}
+
+#mainui-settings {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 50;
+}
+
+#mainui-settings .dialog {
+    z-index: 51;
+}
+
+.leagues-inner-close {
+    float: right;
+    cursor: pointer;
+    opacity: 0.5;
+}
+
+.leagues-inner-close:hover {
+    opacity: 1;
+}
+
+.btn {
+    display: inline-block;
+    margin-bottom: 0;
+    font-size: 15px;
+    font-weight: 700; /* agar.io .btn */
+    line-height: 1.42857143;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    touch-action: manipulation;
+    cursor: pointer;
+    user-select: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-family: 'Ubuntu', sans-serif;
+}
+
+.form-control {
+    display: block;
+    width: 100%;
+    height: 34px;
+    padding: 6px 12px;
+    font-size: 14px;
+    line-height: 1.42857143;
+    color: #555;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-family: 'Ubuntu', sans-serif;
+}
+
+.text-muted {
+    color: #7d7d7d;
+}
+
+.user-picture {
+    object-fit: cover;
+    background: #e8e8e8;
+}
+
+.boost-button {
+    position: absolute;
+}
+
+
+/* playnick — flex layout like agar.io: skins + nick row, play below */
+#helloDialog #playnick {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-top: 5px;
+}
+
+#helloDialog .playnick-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 268px;
+    max-width: calc(100% - 24px);
+}
+
+#helloDialog #skinButton {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+    position: relative;
+    left: 0;
+    cursor: pointer;
+}
+
+#helloDialog #skinButton #skinLabel {
+    position: absolute;
+    top: 16px;
+    left: 10px;
+    z-index: 1;
+    pointer-events: none;
+}
+
+#helloDialog #skinButton .skinWrapper,
+#helloDialog #skinButton .circle.bordered.skinWrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#helloDialog .playnick-inputs {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+#helloDialog #nick {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    height: 28px;
+    position: static;
+    left: auto;
+    top: auto;
+    float: none;
+    margin: 0;
+    padding: 0 10px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    border: 1px solid #A2A2A2;
+    font-size: 14px;
+    color: #343434;
+    outline: none;
+}
+
+#helloDialog #nick:focus {
+    outline: none;
+}
+
+#helloDialog #playnick .btn-play {
+    display: block;
+    width: 243px;
+    max-width: calc(100% - 24px);
+    height: 34px;
+    margin-top: 15px;
+    position: static;
+    top: auto;
+    font-size: 20px;
+    line-height: 34px;
+    padding: 0;
+}
+
+#helloDialog #instructions {
+    position: relative;
+    top: 0;
+    margin-top: 18px;
+}
+
+#helloDialog #instructions.guest {
+    top: 0;
+    margin-top: 16px;
+}
+
+#mainui-promo {
+    padding: 0;
+    overflow: hidden;
+    background-color: unset;
+}
+
+.agario-promo-container {
+    display: block;
+    width: 325px;
+    height: 288px;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+.agario-promo {
+    width: 325px;
+    height: 288px;
+    overflow: hidden;
+}
+
+.agario-promo img {
+    width: 325px;
+    height: 290px;
+    display: block;
+    object-fit: cover;
+    object-position: top center;
+}
+
+.circle.bordered.skinWrapper {
+    border-radius: 50%;
+    width: 46px;
+    height: 46px;
+    border: 3px solid rgb(131, 131, 131);
+}
+
+#skinButton .circle.tiny.green {
+    position: absolute;
+    left: -3px;
+    top: -3px;
+}
+
+#helloDialog #pass {
+    display: none;
+    flex: 0 0 64px;
+    width: 64px;
+    height: 28px;
+    position: static;
+    left: auto;
+    top: auto;
+    float: none;
+    margin: 0;
+    padding: 0 8px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    border: 1px solid #A2A2A2;
+    outline: none;
+    font-family: 'Ubuntu', sans-serif;
+    font-size: 14px;
+    color: #343434;
+}
+
+.ffa,
+.battleroyale,
+.experimental,
+.teams {
+    background-color: #E2E2E2;
+    background-repeat: no-repeat;
+}
+
+.ffa {
+    background-image: url('./img/gamemode_Icon_FFA.png');
+    background-position: top 20px center;
+    background-size: 50px auto;
+}
+
+.battleroyale {
+    background-image: url('./img/gamemode_Icon_BattleRoyale.png');
+    background-position: top 0 center;
+    background-size: 70px auto;
+}
+
+.experimental {
+    background-image: url('./img/gamemode_Icon_Experimental.png');
+    background-position: top 20px center;
+    background-size: 50px auto;
+}
+
+.teams {
+    background-image: url('./img/gamemode_Icon_Teams.png');
+    background-position: top 5px center;
+    background-size: 50px auto;
+}
+
+.option-speed {
+    width: 100%;
+    padding-bottom: 10px;
+}
+
+.option-speed label {
+    display: block;
+    margin-bottom: 4px;
+    width: 100%;
+}
+
+.speed-range {
+    width: 100%;
+}
+
+.speed-marks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #7d7d7d;
+}
+
+#adbg {
+    width: 300px;
+    height: 250px;
+    margin: 0 auto;
+    background: #f5f5f5;
+}
+
+#agar-io_300x250 {
+    text-align: center;
+}
+
+.clearfix::after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+/* currency .label extracted globally — scope & reset other labels */
+.currency-container > .icon {
+    position: absolute;
+    top: 2px;
+    right: 28px;
+}
+
+.currency-container > .icon.dna-small-icon {
+    left: 78px;
+    top: -2px;
+    transform: scale(0.8);
+}
+
+.currency-container > .label {
+    position: absolute;
+    text-align: right;
+    line-height: 24px;
+    width: 77px;
+    font-size: 13px;
+    right: 53px;
+    color: #000;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.feature-button > .label {
+    position: relative;
+    bottom: -35px;
+    width: 100%;
+    font-size: 10.5px;
+    letter-spacing: -0.2px;
+    right: auto;
+    text-align: center;
+    line-height: normal;
+    color: #fff;
+}
+
+.feature-button.gifting > .label {
+    top: 3px;
+    left: 20px;
+    bottom: auto;
+}
+
+.gamemodes .item > .label {
+    display: inline-block;
+    position: static;
+    font-size: 9pt;
+    font-weight: 700;
+    padding-top: 80px;
+    line-height: 11px;
+    width: auto;
+    right: auto;
+    text-align: center;
+    color: #a4a4a4;
+}
+
+.gamemodes .item.active > .label,
+.gamemodes .item:hover > .label {
+    color: #fff;
+}
+
+.potion-slot-button > .label {
+    position: static;
+    right: auto;
+    width: auto;
+    text-align: center;
+    line-height: normal;
+    font-size: inherit;
+    color: inherit;
+}
+
+.free-coins-button .label,
+.coin-shop .label {
+    position: static;
+    right: auto;
+    width: auto;
+    line-height: inherit;
+    font-size: 14px;
+    color: #fff;
+}
+
+/* Beat menu_extracted global .title / .text-muted leaks */
+#helloDialog h4.title {
+    font-weight: 400;
+}
+
+#helloDialog .offers-container > .title,
+#helloDialog h4.party-title,
+#helloDialog .party-title span.party-title {
+    font-weight: 700;
+}
+
+#helloDialog #instructions,
+#helloDialog #instructions span,
+#helloDialog #instructions .text-muted {
+    font-weight: 400;
+}

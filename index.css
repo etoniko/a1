@@ -1,15 +1,25 @@
-/* GLOBAL */
+@import url('./menu_extracted.css');
+@import url('./menu_overrides.css');
+
 @font-face {
   font-family: 'Ubuntu';
-  src: url('./fonts/Ubuntu-Bold.woff2') format('woff2'),
-       url('./fonts/Ubuntu-Bold.woff') format('woff'),
-       url('./fonts/Ubuntu-Bold.ttf') format('truetype');
-  font-weight: 700;
   font-style: normal;
-}
-body, h1, h2, .bold-text {
-  font-family: 'Ubuntu', sans-serif;
   font-weight: 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/ubuntu/v21/4iCs6KVjbNBYlgo6eA.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Ubuntu';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf') format('truetype');
+}
+
+body {
+  font-family: 'Ubuntu', sans-serif;
+  font-weight: 400;
+  color: #343434;
 }
 
 body {
@@ -18,85 +28,35 @@ body {
     overflow: hidden;
 }
 
-/* IDs */
-.from-send{display: flex;background: white;margin-top: 10px;align-items: center;border-radius: 20px;margin-bottom: 20px;}
+#background {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("./img/background.png");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+  z-index: 2;
+}
+
 #overlays {
-    display:none; 
-    position: absolute; 
-    left: 0; 
-    right: 0; 
-    top: 0; 
-    bottom: 0; 
-    background-color: 
-    rgba(0,0,0,0.5); 
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.5);
     z-index: 200;
 }
-/* ===== БОКОВЫЕ БАННЕРЫ 300x600 ===== */
-#ad1, #ad2 {
-    width: 300px;
-    height: 600px;
-    background: #fff;
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 0 25px rgba(0,0,0,0.15);
-    position: fixed;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 10;
+
+#overlays.overlays-visible {
+    display: block;
 }
-
-#ad1 { left: 20px; }
-#ad2 { right: 20px; }
-
-
-/* ===== ВЕРХНИЙ БАННЕР 970x250 ===== */
-#adTop {
-    width: 970px;
-    height: 250px;
-    background: #fff;
-    border-radius: 14px;
-    box-shadow: 0 0 25px rgba(0,0,0,0.15);
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9;
-}
-
-
-/* ===== НИЖНИЙ БАННЕР 970x250 ===== */
-#adBottom {
-    width: 970px;
-    height: 250px;
-    background: #fff;
-    border-radius: 14px;
-    box-shadow: 0 0 25px rgba(0,0,0,0.15);
-    position: fixed;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9;
-}
-
-
-/* ===== СКРЫТИЕ НА МАЛЕНЬКИХ ЭКРАНАХ ===== */
-@media (max-width: 1600px) {
-    #ad1, #ad2 {
-        display: none;
-    }
-}
-
-@media (max-width: 1000px) {
-    #adTop, #adBottom {
-        display: none;
-    }
-}
-
-
-#title {
-    padding: 10px;
-}
-#captcha-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0, 0, 0, 0.5);display:flex;justify-content:center;align-items:center;z-index:9999;}
 
 #canvas {
     position: absolute;
@@ -106,30 +66,52 @@ body {
     bottom: 0;
     width: 100%;
     height: 100%;
+    z-index: 1;
+}
+
+#chat_textbox {
+    transition: all .5s ease-in-out;
+    position: absolute;
+    z-index: 1;
+    bottom: 10px;
+    background: rgba(0, 0, 0, .2);
+    border: 0;
+    outline: none;
+    color: #FFF;
+    height: 30px;
+    text-indent: 12px;
+    left: 10px;
+    width: 300px;
+    font-family: 'Ubuntu', sans-serif;
+    font-weight: 400;
+}
+
+#chat_textbox:focus {
+    background: rgba(0, 0, 0, .5);
 }
 
 #connecting,
 #disconnected {
-    display:none;
-    position: absolute; 
-    left: 0; 
-    right: 0; 
-    top: 0; 
-    bottom: 0; 
-    z-index: 100; 
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
     background-color: rgba(0,0,0,0.5);
 }
+
 #disconnected .connecting-box {
     text-align: center;
 }
+
 #disconnect-status {
     margin: 8px 0 14px;
     font-size: 14px;
     color: #333;
 }
-#reconnect-btn {
-    width: 100%;
-}
+
 .connecting-box {
     width: 350px;
     background-color: #FFFFFF;
@@ -137,11 +119,13 @@ body {
     border-radius: 15px;
     padding: 8px 15px 12px;
 }
+
 #connect-status {
     margin: 8px 0 10px;
     font-size: 14px;
     color: #333;
 }
+
 .connect-progress-wrap {
     width: 100%;
     height: 8px;
@@ -150,6 +134,7 @@ body {
     overflow: hidden;
     margin-bottom: 10px;
 }
+
 #connect-progress {
     width: 0%;
     height: 100%;
@@ -157,11 +142,7 @@ body {
     border-radius: 4px;
     transition: width 0.2s ease;
 }
-.connect-hint {
-    font-size: 12px;
-    color: #666;
-    margin: 0;
-}
+
 .connect-verify-data-stream {
     font-family: Consolas, Monaco, monospace;
     font-size: 11px;
@@ -172,114 +153,72 @@ body {
     text-overflow: ellipsis;
 }
 
-#nick {
+#reconnect-btn {
     width: 100%;
-    outline: none;
-    border: 0px;
-    height: 33px;
-    padding-left: 8px;
+    height: 36px;
+    border: 0;
     border-radius: 5px;
-    border: 1px solid #ccc;
-    margin-right: 10px;
-}
-#pass {
-    display: none;
-    width: 80px;
-    height: 33px;
-    padding-left: 5px;
-    outline: none;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    margin-right: 10px;
+    background: #54c800;
+    color: #fff;
+    font-family: 'Ubuntu', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
 }
 
-#gamemode {
-    width: 100px;
-    float: right;
+#reconnect-btn:hover {
+    background: #347F01;
+}
+header#mainui-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 30px;
+  z-index: 300;
+  pointer-events: none;
 }
 
-#helloDialog {
-    width: 380px;
-    background-color: #FFFFFF;
-    margin: 10px auto;
-    border-radius: 15px;
-    padding: 5px 15px 5px 15px;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    margin-right: -50%;
-    -webkit-transform: translate(-50%, -50%);
-    -ms-transform: translate(-50%, -50%);
-    transform: translate(-50%, -50%);
+header#mainui-header.hidden {
+  display: none;
 }
 
-#chat_textbox {
-    -webkit-transition: all .5s ease-in-out;
-    -moz-transition: all .5s ease-in-out;
-    -o-transition: all .5s ease-in-out;
-    transition: all .5s ease-in-out;
-    position: absolute;
-    z-index: 1;
-    bottom: 10px;
-    background: rgba(0, 0, 0, .2);
-    border: 0px;
-    outline: none;
-    color: #FFF;
-    height: 30px;
-    text-indent: 12px;
-    left: 10px;
-    width: 300px;
+.tosBox {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  background-color: #FFF;
+  padding: 5px 10px;
+  font-size: 12px;
+  pointer-events: auto;
+  font-family: 'Ubuntu', sans-serif;
+  font-weight: 400;
+  white-space: nowrap;
 }
 
-#chat_textbox:focus {
-    background: rgba(0, 0, 0, .5);
+.tosBox.left {
+  left: 0;
+  border-radius: 0 0 5px 0;
 }
 
-#footer {
-    text-align: center;
-    margin-bottom: 10px;
-    margin-top: -10px;
+.tosBox.right {
+  right: 0;
+  border-radius: 0 0 0 5px;
 }
 
-#play-btn {
-    width: 85%;
-    float: left;
+.tosBox a.text-muted {
+  color: #777;
+  text-decoration: none;
 }
 
-#settings-btn {
-    width: 13%;
-    float: right;
+.tosBox a.text-muted:hover {
+  color: #555;
+  text-decoration: underline;
 }
 
-#spectate-btn {
-    margin-top: -5px;
-}
-
-/* CLASSES */
-
-.checkbox label {
-    margin-right: 10px;
-}
-
-.mb-10 {
-    margin-bottom: 10px;
-}
-
-.loader {
-    border: 6px solid #f3f3f3;
-    border-top: 6px solid #3498db;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 2s linear infinite;
-}
-
-.center {
-    display: table;
-    margin: 0 auto;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+.tosBox .tos-sep {
+  color: #777;
+  margin: 0 6px;
+  user-select: none;
 }

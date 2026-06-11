@@ -1,5 +1,102 @@
 const serverPowSupportCache = new Map();
 
+const CANVAS_FONT_FAMILY = "Ubuntu";
+let canvasFontReady = false;
+
+function canvasFont(sizePx) {
+    return `bold ${sizePx}px ${CANVAS_FONT_FAMILY}`;
+}
+
+function ensureCanvasFont() {
+    if (canvasFontReady) return Promise.resolve();
+    if (!document.fonts || !document.fonts.load) {
+        canvasFontReady = true;
+        return Promise.resolve();
+    }
+    return Promise.all([
+        document.fonts.load(`700 12px ${CANVAS_FONT_FAMILY}`),
+        document.fonts.load(`700 24px ${CANVAS_FONT_FAMILY}`),
+        document.fonts.load(`700 48px ${CANVAS_FONT_FAMILY}`),
+        document.fonts.load(`700 96px ${CANVAS_FONT_FAMILY}`),
+    ]).then(() => {
+        canvasFontReady = true;
+    }).catch(() => {
+        canvasFontReady = true;
+    });
+}
+
+function invalidateCanvasTextCaches() {
+    if (!game) return;
+    if (game.scoreText) game.scoreText._dirty = true;
+    if (game.Cells) {
+        for (const cell of game.Cells) {
+            if (cell.nameCache) cell.nameCache._dirty = true;
+            if (cell.sizeCache) cell.sizeCache._dirty = true;
+        }
+    }
+}
+
+const CHAT_MAX_WIDTH = 320;
+const CHAT_LINE_HEIGHT = 20;
+const CHAT_FONT_SIZE = 18;
+const CHAT_BASE_X = 15;
+
+function getChatMeasureCtx(fontSize) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    ctx.font = canvasFont(fontSize);
+    return ctx;
+}
+
+function measureChatTextWidth(text, fontSize) {
+    if (!text) return 0;
+    return getChatMeasureCtx(fontSize).measureText(text).width;
+}
+
+function wrapTextToLines(text, maxWidth, fontSize) {
+    const ctx = getChatMeasureCtx(fontSize);
+    const lines = [];
+    if (!text) return lines;
+
+    let start = 0;
+    while (start < text.length) {
+        let end = start;
+        while (end < text.length && ctx.measureText(text.slice(start, end + 1)).width <= maxWidth) {
+            end++;
+        }
+        if (end === start) end = start + 1;
+
+        let slice = text.slice(start, end);
+        const breakAt = slice.lastIndexOf(" ");
+        if (breakAt > 0 && end < text.length) {
+            end = start + breakAt;
+            slice = text.slice(start, end);
+        }
+
+        const line = slice.trimEnd();
+        if (line) lines.push(line);
+        start = end;
+        while (start < text.length && text[start] === " ") start++;
+    }
+    return lines.length ? lines : [""];
+}
+
+function wrapChatMessageLines(message, prefixWidth, maxWidth, fontSize) {
+    const lines = [];
+    let remaining = String(message || "");
+    const firstMax = Math.max(40, maxWidth - prefixWidth);
+
+    while (remaining.length) {
+        const maxW = lines.length === 0 ? firstMax : maxWidth;
+        const chunkLines = wrapTextToLines(remaining, maxW, fontSize);
+        if (!chunkLines.length) break;
+        lines.push(chunkLines[0]);
+        remaining = remaining.slice(chunkLines[0].length);
+        if (remaining.startsWith(" ")) remaining = remaining.slice(1);
+    }
+    return lines.length ? lines : [""];
+}
+
 function getGameServerApiBase(hostOrUrl) {
     if (!hostOrUrl) return "https://ffa.agar.su";
     if (/^https?:\/\//i.test(hostOrUrl)) return String(hostOrUrl).replace(/\/$/, "");
@@ -121,12 +218,12 @@ async function fetchConnectToken(gameHost) {
     try {
         res = await fetch(apiBase + "/challenge", { cache: "no-store" });
     } catch (err) {
-        serverPowSupportCache.set(apiBase, false);
+        console.error("Connect token fetch error:", err);
         return null;
     }
 
     if (!res.ok) {
-        serverPowSupportCache.set(apiBase, false);
+        if (res.status === 404) serverPowSupportCache.set(apiBase, false);
         return null;
     }
 
@@ -134,12 +231,11 @@ async function fetchConnectToken(gameHost) {
     try {
         challenge = await res.json();
     } catch (err) {
-        serverPowSupportCache.set(apiBase, false);
+        console.error("Connect challenge parse error:", err);
         return null;
     }
 
     if (!challenge || !challenge.challengeId || challenge.prefix == null || challenge.difficulty == null) {
-        serverPowSupportCache.set(apiBase, false);
         return null;
     }
 
@@ -160,6 +256,71 @@ function setConnectingUI(text, pct) {
     if (bar && pct != null) bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
 }
 
+const HELLO_DIALOG_BASE_W = 985;
+const HELLO_DIALOG_PAD = 40;
+
+function updateHelloDialogScale() {
+    const dialog = document.getElementById("helloDialog");
+    if (!dialog) return;
+    const baseH = dialog.scrollHeight || 280;
+    const scaleW = (innerWidth - HELLO_DIALOG_PAD * 2) / HELLO_DIALOG_BASE_W;
+    const scaleH = (innerHeight - HELLO_DIALOG_PAD * 2) / baseH;
+    const scale = Math.min(1, scaleW, scaleH);
+    dialog.style.transform = "translate(-50%, -50%) scale(" + scale + ")";
+}
+
+function initHelloDialogScale() {
+    updateHelloDialogScale();
+    const dialog = document.getElementById("helloDialog");
+    if (dialog && typeof ResizeObserver !== "undefined") {
+        new ResizeObserver(updateHelloDialogScale).observe(dialog);
+    }
+}
+
+const SERVERS = {
+    ffa: "ffa.agar.su",
+    ff2: "ffa.agar.su:6003",
+    ms: "ffa.agar.su:6002",
+    pvp1: "ffa.agar.su:6004",
+	tournament: "ffa.agar.su:6006",
+};
+
+function resolveServerUrl(arg) {
+    if (!arg) return SERVERS.ffa;
+    return SERVERS[arg] || arg;
+}
+
+function resolveServerKey(urlOrKey) {
+    if (SERVERS[urlOrKey]) return urlOrKey;
+    return Object.keys(SERVERS).find(k => SERVERS[k] === urlOrKey) || "ffa";
+}
+
+function syncGamemodeUI(urlOrKey) {
+    const key = resolveServerKey(urlOrKey);
+    document.querySelectorAll(".gamemodes .item").forEach(el => {
+        el.classList.toggle("active", el.dataset.server === key);
+    });
+}
+
+class Vector2 {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    reset(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    copyFrom(v) {
+        this.x = v.x;
+        this.y = v.y;
+    }
+    minusEq(v) {
+        this.x -= v.x;
+        this.y -= v.y;
+    }
+}
+
 class Game {
     constructor() {
         // Соединение
@@ -170,17 +331,18 @@ class Game {
         this.connectInProgress = false;
         this.wasEverConnected = false;
         this.wsClosingIntentional = false;
-        this.pingIntervalId = null;
         this.tabHiddenCloseTimer = null;
         this.tabHiddenSince = null;
         this.tabHiddenCloseSec = 600;
         this.disconnectedVisible = false;
+        this.showMenuBackground = true;
         this.useHttps = location.protocol === "https:";
         // Canvas и отрисовка
         this.canvas = null;
         this.ctx = null;
         this.canvasWidth = 0;
         this.canvasHeight = 0;
+        this.dpr = window.devicePixelRatio || 1;
         this.viewZoom = 1;
         this.zoom = 1;
         this.nodeX = 0;
@@ -227,14 +389,28 @@ class Game {
         this.Y = -1;
         this.oldX = -1;
         this.oldY = -1;
-        // Производительность и время
+        this.touchable = "createTouch" in window || navigator.maxTouchPoints > 0;
+        this.touches = [];
+        this.leftTouchID = -1;
+        this.leftTouchPos = new Vector2(0, 0);
+        this.leftTouchStartPos = new Vector2(0, 0);
+        this.leftVector = new Vector2(0, 0);
+        this.joystickRadius = 240;
+        this.joystickInnerR = 28;
+        this.joystickOuterR = 85;
+        this.cursorSize = 20;
+        this.pinchZoomStartDistance = 0;
+        this.isPinching = false;
+        this.ejectInterval = null;
+        this.ejectPressedByTouch = false;
+        this.isTouchStart = "ontouchstart" in window && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        this.splitPressed = false;
+        this.ejectPressed = false;
+        this.splitIcon = new Image();
+        this.ejectIcon = new Image();
+        this.splitIcon.src = "https://agar.su/assets/photo/split.png";
+        this.ejectIcon.src = "https://agar.su/assets/photo/eject.png";
         this.timestamp = 0;
-        this.cb = 0; // счётчик кадров
-        this.fpsLastTime = 0;
-        this.fpsCount = 0;
-        this.currentFPS = 0;
-		this.ping = 0;    
-        this.pingstamp = 0;
         // Управление
         this.isTyping = false;
         this.spacePressed = false;
@@ -242,6 +418,7 @@ class Game {
         this.hasOverlay = true;
         //прочее
         this.z = 1;
+        this.qTree = null;
         this.cellColors = [];
         this.teamColor = ["#333333", "#FF3333", "#33FF33", "#3333FF"];
         this.ma = false;
@@ -365,37 +542,74 @@ getSkinForNick(nick) {
         return ~~((xp / 100 * 2) ** 0.5);
     }
 setNick(arg) {
-    this.userNickName = arg + "#";
+    this.userNickName = arg;
     this.hideOverlays();
     if (!this.connectShown) {
-        this.showConnecting();
         this.connectShown = true;
+        this.showConnecting();
     } else {
-    // Отправляем ник напрямую (без капчи)
-    this.sendNickName();
+        this.joinCurrentServer();
     }
     this.userScore = 0;
 }
 setSpect() {
     this.userNickName = null;
-    if (!this.connectShown) {
-        this.showConnecting();
-        this.connectShown = true;
-    } else {
-        this.sendUint8(1);
-    }
-    
     this.hideOverlays();
+    if (!this.connectShown) {
+        this.connectShown = true;
+        this.showConnecting();
+    } else {
+        this.joinCurrentServer();
+    }
 }
+    updateServerHash(url) {
+        const hash = resolveServerKey(url);
+        history.replaceState(null, "", "#" + hash);
+    }
+    syncGamemodeSelect(url) {
+        syncGamemodeUI(url);
+    }
+    initServersFromHash(reconnect) {
+        const rawHash = location.hash.slice(1).split("?")[0];
+        const hash = rawHash || "ffa";
+        let url = SERVERS[hash] || null;
+        if (!url) url = SERVERS.ffa;
+        syncGamemodeUI(hash);
+        if (!rawHash || !SERVERS[rawHash]) {
+            this.updateServerHash(url);
+        }
+        if (url === this.CONNECTION_URL) return;
+        this.CONNECTION_URL = url;
+        if (reconnect && this.ma && (this.connectShown || this.wsIsOpen())) {
+            this.userNickName = null;
+            this.connectShown = true;
+            this.hideDisconnected();
+            document.querySelector("#connecting").style.display = "block";
+            setConnectingUI("Подключение к серверу…", 5);
+            this.showConnecting();
+        }
+    }
     setServer(arg) {
-        if (arg !== this.CONNECTION_URL) {
-            this.CONNECTION_URL = arg;
-            if (this.ma) {
-                this.hideDisconnected();
-                document.querySelector("#connecting").style.display = "block";
-                setConnectingUI("Подключение к серверу…", 5);
-                this.showConnecting();
-            }
+        const url = resolveServerUrl(arg);
+        if (url === this.CONNECTION_URL) return;
+        this.CONNECTION_URL = url;
+        this.updateServerHash(url);
+        syncGamemodeUI(arg);
+        if (this.ma && (this.connectShown || this.wsIsOpen())) {
+            this.userNickName = null;
+            this.connectShown = true;
+            this.hideDisconnected();
+            document.querySelector("#connecting").style.display = "block";
+            setConnectingUI("Подключение к серверу…", 5);
+            this.showConnecting();
+        }
+    }
+    joinCurrentServer() {
+        if (!this.wsIsOpen()) return;
+        if (this.userNickName != null) {
+            this.sendNickName();
+        } else {
+            this.sendUint8(1);
         }
     }
 
@@ -408,8 +622,8 @@ setSpect() {
         this.ctx = this.mainCanvas.getContext("2d");
 		this.loadSkinList();
         this.mainCanvas.onmousemove = (event) => {
-            this.rawMouseX = event.clientX;
-            this.rawMouseY = event.clientY;
+            this.rawMouseX = event.clientX * this.dpr;
+            this.rawMouseY = event.clientY * this.dpr;
             this.mouseCoordinateChange();
         };
         const updateMouseAim = () => {
@@ -427,6 +641,11 @@ setSpect() {
             }
         });
         this.mainCanvas.onmouseup = function() {};
+        if (this.touchable) {
+            this.mainCanvas.addEventListener("touchstart", this.onTouchStart.bind(this), false);
+            this.mainCanvas.addEventListener("touchmove", this.onTouchMove.bind(this), false);
+            this.mainCanvas.addEventListener("touchend", this.onTouchEnd.bind(this), false);
+        }
         if (/firefox/i.test(navigator.userAgent)) {
             document.addEventListener("DOMMouseScroll", this.handleWheel.bind(this), false);
         } else {
@@ -474,7 +693,9 @@ setSpect() {
                     }
                     break;
                 case 27:
-                    this.showOverlays(true);
+                    if (this.connectShown) {
+                        this.showOverlays();
+                    }
                     break;
             }
         };
@@ -503,17 +724,17 @@ setSpect() {
         });
         onresize = this.canvasResize.bind(this);
         this.canvasResize();
+        initHelloDialogScale();
         if (requestAnimationFrame) {
             requestAnimationFrame(this.redrawGameScene.bind(this));
         } else {
             setInterval(this.drawGameScene.bind(this), 1E3 / 60);
         }
         setInterval(this.sendMouseMove.bind(this), 40);
-        document.querySelector("#overlays").style = "display:block;";
-		const select = document.getElementById("gamemode");
-if (select && select.value) {
-    this.CONNECTION_URL = select.value;
-}
+        document.querySelector("#overlays").classList.add("overlays-visible");
+        this.updateBackgroundVisibility();
+        this.initServersFromHash(false);
+        window.addEventListener("hashchange", () => this.initServersFromHash(true));
         const reconnectBtn = document.getElementById("reconnect-btn");
         if (reconnectBtn) {
             reconnectBtn.addEventListener("click", () => this.manualReconnect());
@@ -525,18 +746,231 @@ if (select && select.value) {
         if (this.zoom > 4 / this.viewZoom) this.zoom = 4 / this.viewZoom;
         if (this.zoom < 0.3) this.zoom = 0.3;
     }
+    onTouchStart(e) {
+        const dpr = this.dpr;
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+            var size = ~~(this.canvasWidth / 7);
+            var tx = touch.clientX * dpr;
+            var ty = touch.clientY * dpr;
+
+            if (
+                tx > this.canvasWidth - size &&
+                ty > this.canvasHeight - size
+            ) {
+                this.sendMouseMove();
+                this.sendUint8(17);
+                continue;
+            }
+
+            if (
+                tx > this.canvasWidth - size &&
+                ty > this.canvasHeight - 2 * size - 10 &&
+                ty < this.canvasHeight - size - 10
+            ) {
+                this.ejectPressedByTouch = true;
+                if (!this.ejectInterval) {
+                    this.sendMouseMove();
+                    this.sendUint8(21);
+                    this.ejectInterval = setInterval(() => {
+                        if (this.ejectPressedByTouch && this.wsIsOpen()) {
+                            this.sendMouseMove();
+                            this.sendUint8(21);
+                        }
+                    }, 80);
+                }
+                continue;
+            }
+
+            if (this.leftTouchID < 0) {
+                this.leftTouchID = touch.identifier;
+                this.leftTouchStartPos.reset(tx, ty);
+                this.leftTouchPos.copyFrom(this.leftTouchStartPos);
+                this.leftVector.reset(0, 0);
+            }
+        }
+        this.touches = e.touches;
+    }
+    onTouchMove(e) {
+        e.preventDefault();
+        const dpr = this.dpr;
+
+        if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const currentDistance = Math.sqrt(dx * dx + dy * dy);
+
+            if (!this.isPinching) {
+                this.pinchZoomStartDistance = currentDistance;
+                this.isPinching = true;
+            } else {
+                const delta = currentDistance - this.pinchZoomStartDistance;
+                const zoomFactor = 1 + delta / 300;
+                this.zoom *= zoomFactor;
+                if (this.zoom < 0.3) this.zoom = 0.3;
+                if (this.zoom > 4 / this.viewZoom) this.zoom = 4 / this.viewZoom;
+                this.pinchZoomStartDistance = currentDistance;
+            }
+            return;
+        }
+
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+            if (this.leftTouchID === touch.identifier) {
+                this.leftTouchPos.reset(touch.clientX * dpr, touch.clientY * dpr);
+                this.leftVector.copyFrom(this.leftTouchPos);
+                this.leftVector.minusEq(this.leftTouchStartPos);
+                const distance = Math.sqrt(this.leftVector.x ** 2 + this.leftVector.y ** 2);
+                if (distance > this.joystickRadius) {
+                    const scale = this.joystickRadius / distance;
+                    this.leftVector.x *= scale;
+                    this.leftVector.y *= scale;
+                    this.leftTouchPos.x = this.leftTouchStartPos.x + this.leftVector.x;
+                    this.leftTouchPos.y = this.leftTouchStartPos.y + this.leftVector.y;
+                }
+                this.rawMouseX = this.leftVector.x * 3 + this.canvasWidth / 2;
+                this.rawMouseY = this.leftVector.y * 3 + this.canvasHeight / 2;
+                this.mouseCoordinateChange();
+                this.sendMouseMove();
+            }
+        }
+        this.touches = e.touches;
+    }
+    onTouchEnd(e) {
+        if (e.touches.length < 2) {
+            this.isPinching = false;
+        }
+        const dpr = this.dpr;
+
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+
+            if (this.leftTouchID === touch.identifier) {
+                this.leftTouchID = -1;
+                this.leftVector.reset(0, 0);
+            }
+
+            var size = ~~(this.canvasWidth / 7);
+            var tx = touch.clientX * dpr;
+            var ty = touch.clientY * dpr;
+            if (
+                tx > this.canvasWidth - size &&
+                ty > this.canvasHeight - 2 * size - 10 &&
+                ty < this.canvasHeight - size - 10
+            ) {
+                this.ejectPressedByTouch = false;
+                if (this.ejectInterval) {
+                    clearInterval(this.ejectInterval);
+                    this.ejectInterval = null;
+                }
+            }
+        }
+
+        if (e.touches.length === 0) {
+            this.ejectPressedByTouch = false;
+            if (this.ejectInterval) {
+                clearInterval(this.ejectInterval);
+                this.ejectInterval = null;
+            }
+        }
+
+        this.touches = e.touches;
+    }
+    drawSplitIcon(ctx) {
+        var size = ~~(this.canvasWidth / 7);
+        if (this.isTouchStart) {
+            if (this.splitPressed && this.splitIcon.width) {
+                ctx.save();
+                ctx.scale(1.1, 0);
+            }
+            if (this.splitIcon.width) {
+                ctx.drawImage(this.splitIcon, this.canvasWidth - size, this.canvasHeight - size, size, size);
+            }
+            if (this.splitPressed) {
+                ctx.restore();
+                setTimeout(() => { this.splitPressed = false; }, 150);
+            }
+
+            if (this.ejectPressed && this.ejectIcon.width) {
+                ctx.save();
+                ctx.scale(1.1, 0);
+            }
+            if (this.ejectIcon.width) {
+                ctx.drawImage(this.ejectIcon, this.canvasWidth - size, this.canvasHeight - 2 * size - 20, size, size);
+            }
+            if (this.ejectPressed) {
+                ctx.restore();
+                setTimeout(() => { this.ejectPressed = false; }, 150);
+            }
+        }
+    }
+    drawTouch(ctx) {
+        ctx.save();
+        if (this.touchable) {
+            for (var i = 0; i < this.touches.length; i++) {
+                var touch = this.touches[i];
+                if (touch.identifier == this.leftTouchID) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = "#0096ff";
+                    ctx.lineWidth = 4;
+                    ctx.arc(this.leftTouchStartPos.x, this.leftTouchStartPos.y, this.joystickInnerR, 0, Math.PI * 2, true);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.strokeStyle = "#0096ff";
+                    ctx.lineWidth = 2;
+                    ctx.arc(this.leftTouchStartPos.x, this.leftTouchStartPos.y, this.joystickOuterR, 0, Math.PI * 2, true);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.strokeStyle = "#0096ff";
+                    ctx.arc(this.leftTouchPos.x, this.leftTouchPos.y, this.joystickInnerR, 0, Math.PI * 2, true);
+                    ctx.stroke();
+
+                    ctx.fillStyle = "#0096ff";
+                    ctx.fillRect(
+                        this.rawMouseX - this.cursorSize / 2,
+                        this.rawMouseY - this.cursorSize / 2,
+                        this.cursorSize,
+                        this.cursorSize
+                    );
+                }
+            }
+        }
+        ctx.restore();
+    }
     mouseCoordinateChange() {
         this.X = (this.rawMouseX - this.canvasWidth / 2) / this.viewZoom + this.nodeX;
         this.Y = (this.rawMouseY - this.canvasHeight / 2) / this.viewZoom + this.nodeY;
     }
+    shouldHideGameCanvas() {
+        if (this.showMenuBackground && this.hasOverlay) return true;
+        if (this.disconnectedVisible) return true;
+        const connecting = document.getElementById("connecting");
+        return connecting && connecting.style.display === "block";
+    }
+    updateBackgroundVisibility() {
+        const bg = document.getElementById("background");
+        if (!bg) return;
+        bg.style.display = (this.showMenuBackground && this.hasOverlay) ? "block" : "none";
+        this.updateLegalHeaderVisibility();
+    }
+    updateLegalHeaderVisibility() {
+        const header = document.getElementById("mainui-header");
+        if (!header) return;
+        header.classList.toggle("hidden", !(this.showMenuBackground && this.hasOverlay));
+    }
     hideOverlays() {
         this.hasOverlay = false;
-        document.querySelector("#overlays").style = "display:none;";
+        this.showMenuBackground = false;
+        document.querySelector("#overlays").classList.remove("overlays-visible");
+        this.updateBackgroundVisibility();
     }
-    showOverlays(arg) {
+    showOverlays(clearNick) {
         this.hasOverlay = true;
-        this.userNickName = null;
-        document.querySelector("#overlays").style = "display:block;";
+        if (clearNick) {
+            this.userNickName = null;
+        }
+        document.querySelector("#overlays").classList.add("overlays-visible");
+        this.updateBackgroundVisibility();
     }
     hideDisconnected() {
         this.disconnectedVisible = false;
@@ -549,6 +983,7 @@ if (select && select.value) {
         const connecting = document.querySelector("#connecting");
         if (connecting) connecting.style.display = "none";
         if (box) box.style.display = "block";
+        this.updateBackgroundVisibility();
     }
     clearGameState() {
         this.playerCells = [];
@@ -592,10 +1027,6 @@ if (select && select.value) {
     closeWsForHiddenTab() {
         if (!this.wsIsOpen()) return;
         this.wsClosingIntentional = true;
-        if (this.pingIntervalId != null) {
-            clearInterval(this.pingIntervalId);
-            this.pingIntervalId = null;
-        }
         try {
             this.ws.close();
         } catch (e) {}
@@ -611,7 +1042,7 @@ if (select && select.value) {
     showConnecting() {
         const wsUrl = (this.useHttps ? "wss://" : "ws://") + this.CONNECTION_URL;
         if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentWebSocketUrl === wsUrl) {
-            console.log("Соединение уже активно для этого URL, пропускаем повторное подключение.");
+            this.joinCurrentServer();
             return;
         }
         if (this.ma) {
@@ -620,26 +1051,55 @@ if (select && select.value) {
         }
     }
     
+    async closeWsForReconnect() {
+        if (!this.ws) return;
+        this.wsClosingIntentional = true;
+        const oldWs = this.ws;
+        this.ws = null;
+        oldWs.onopen = null;
+        oldWs.onmessage = null;
+        await new Promise(resolve => {
+            let done = false;
+            const finish = () => {
+                if (done) return;
+                done = true;
+                resolve();
+            };
+            oldWs.onclose = finish;
+            oldWs.onerror = finish;
+            try {
+                oldWs.close();
+            } catch (e) {
+                finish();
+            }
+            setTimeout(finish, 800);
+        });
+        this.wsClosingIntentional = false;
+    }
     async wsConnect(wsUrlArg) {
+        if (this._wsConnectChain) {
+            await this._wsConnectChain;
+        }
+        let release;
+        this._wsConnectChain = new Promise(resolve => { release = resolve; });
+        try {
+            await this._wsConnectImpl(wsUrlArg);
+        } finally {
+            release();
+            this._wsConnectChain = null;
+        }
+    }
+    async _wsConnectImpl(wsUrlArg) {
         if (this.connectInProgress) return;
         this.connectInProgress = true;
         setConnectingUI("Подключение к серверу…", 5);
         document.querySelector("#connecting").style.display = "block";
 
-        if (this.ws) {
-            this.wsClosingIntentional = true;
-            this.ws.onopen = null;
-            this.ws.onmessage = null;
-            this.ws.onclose = null;
-            try {
-                this.ws.close();
-            } catch (b) {}
-            this.ws = null;
-        }
+        await this.closeWsForReconnect();
+        this.clearGameState();
 
         const host = this.CONNECTION_URL;
         const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + host;
-        this.clearGameState();
 
         let connectToken = null;
         try {
@@ -658,11 +1118,25 @@ if (select && select.value) {
         const query = qs.toString();
 
         console.info("Connecting to " + wsUrl + "..");
-        this.ws = new WebSocket(wsUrl + (query ? "?" + query : ""), "eSejeKSVdysQvZs0ES1H");
-        this.ws.binaryType = "arraybuffer";
-        this.ws.onopen = this.onWsOpen.bind(this);
-        this.ws.onmessage = this.onWsMessage.bind(this);
-        this.ws.onclose = this.onWsClose.bind(this);
+        const ws = new WebSocket(wsUrl + (query ? "?" + query : ""), "eSejeKSVdysQvZs0ES1H");
+        ws.binaryType = "arraybuffer";
+        this.ws = ws;
+        ws.onopen = () => {
+            if (this.ws !== ws) return;
+            this.onWsOpen();
+        };
+        ws.onmessage = (msg) => {
+            if (this.ws !== ws) return;
+            this.onWsMessage(msg);
+        };
+        ws.onclose = () => {
+            if (this.ws === ws) this.ws = null;
+            this.onWsClose();
+        };
+        ws.onerror = () => {
+            if (this.ws !== ws) return;
+            setConnectingUI("Сервер отклонил подключение (лимит IP или проверка)", 5);
+        };
         this.connectInProgress = false;
     }
 
@@ -693,17 +1167,8 @@ if (select && select.value) {
         msg.setUint8(0, 255);
         msg.setUint32(1, 0, true);
         this.wsSend(msg);
-        this.sendNickName();
+        this.joinCurrentServer();
         console.info("Connection successful!");
-        if (this.pingIntervalId != null) {
-            clearInterval(this.pingIntervalId);
-        }
-        this.pingIntervalId = setInterval(() => {
-            if (!document.hidden && this.wsIsOpen()) {
-                this.pingstamp = Date.now();
-                this.wsSend(new Uint8Array([2]));
-            }
-        }, 3000);
         setTimeout(() => { this.sendChat("вошёл в игру!"); }, 1000);
     }
     onWsClose() {
@@ -716,10 +1181,6 @@ if (select && select.value) {
             }
         } else {
             this.cancelTabHiddenClose();
-        }
-        if (this.pingIntervalId != null) {
-            clearInterval(this.pingIntervalId);
-            this.pingIntervalId = null;
         }
         this.ws = null;
         if (closedForHiddenTab) {
@@ -748,9 +1209,8 @@ if (select && select.value) {
         }
         const messageType = msg.getUint8(offset++);
         switch (messageType) {
-			                 case 2:
-        this.ping = Date.now() - this.pingstamp;
-        break;
+            case 2:
+                break;
             case 16:
                 const reader = new BinaryReader(msg);
                 reader.offset++;
@@ -933,10 +1393,14 @@ if (select && select.value) {
     }
     canvasResize() {
         window.scrollTo(0, 0);
-        this.canvasWidth = innerWidth;
-        this.canvasHeight = innerHeight;
+        this.dpr = window.devicePixelRatio || 1;
+        this.canvasWidth = innerWidth * this.dpr;
+        this.canvasHeight = innerHeight * this.dpr;
         this.nCanvas.width = this.canvasWidth;
         this.nCanvas.height = this.canvasHeight;
+        this.nCanvas.style.width = innerWidth + "px";
+        this.nCanvas.style.height = innerHeight + "px";
+        updateHelloDialogScale();
         this.drawGameScene();
     }
     viewRange() {
@@ -951,21 +1415,51 @@ if (select && select.value) {
             this.viewZoom = (9 * this.viewZoom + newViewZoom) / 10;
         }
     }
+    buildQTree() {
+        if (0.4 > this.viewZoom) this.qTree = null;
+        else {
+            var a = Number.POSITIVE_INFINITY,
+                b = Number.POSITIVE_INFINITY,
+                c = Number.NEGATIVE_INFINITY,
+                d = Number.NEGATIVE_INFINITY,
+                e = 0;
+            for (var i = 0; i < this.nodelist.length; i++) {
+                var node = this.nodelist[i];
+                if (node.shouldRender() && !node.prepareData && 20 < node.size * this.viewZoom) {
+                    e = Math.max(node.size, e);
+                    a = Math.min(node.x, a);
+                    b = Math.min(node.y, b);
+                    c = Math.max(node.x, c);
+                    d = Math.max(node.y, d);
+                }
+            }
+            this.qTree = Quad.init({
+                minX: a - (e + 100),
+                minY: b - (e + 100),
+                maxX: c + (e + 100),
+                maxY: d + (e + 100),
+                maxChildren: 2,
+                maxDepth: 4
+            });
+            for (i = 0; i < this.nodelist.length; i++) {
+                node = this.nodelist[i];
+                if (node.shouldRender() && !(20 >= node.size * this.viewZoom)) {
+                    for (a = 0; a < node.points.length; ++a) {
+                        b = node.points[a].x;
+                        c = node.points[a].y;
+                        b < this.nodeX - this.canvasWidth / 2 / this.viewZoom || c < this.nodeY - this.canvasHeight / 2 / this.viewZoom || b > this.nodeX + this.canvasWidth / 2 / this.viewZoom || c > this.nodeY + this.canvasHeight / 2 / this.viewZoom || this.qTree.insert(node.points[a]);
+                    }
+                }
+            }
+        }
+    }
     drawGameScene() {
+        if (this.shouldHideGameCanvas()) {
+            this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+            return;
+        }
         var a, oldtime = Date.now();
-        ++this.cb;
         this.timestamp = oldtime;
-        if (!window.fpsLastTime) {
-            window.fpsLastTime = oldtime;
-            window.fpsCount = 0;
-            window.currentFPS = 0;
-        }
-        window.fpsCount++;
-        if (oldtime - window.fpsLastTime >= 900) { // обновляем ~каждые 0.9 сек
-            window.currentFPS = Math.round(window.fpsCount * 1000 / (oldtime - window.fpsLastTime));
-            window.fpsCount = 0;
-            window.fpsLastTime = oldtime;
-        }
         if (0 < this.playerCells.length) {
             this.calcViewZoom();
             var c = a = 0;
@@ -984,8 +1478,10 @@ if (select && select.value) {
             this.nodeY = (29 * this.nodeY + this.posY) / 30;
             this.viewZoom = (9 * this.viewZoom + this.posSize * this.viewRange()) / 10;
         }
+        this.buildQTree();
         this.mouseCoordinateChange();
         this.drawGrid();
+        this.nodelist.sort((a, b) => a.size - b.size || a.id - b.id);
         this.ctx.save();
         this.ctx.translate(this.canvasWidth / 2, this.canvasHeight / 2);
         this.ctx.scale(this.viewZoom, this.viewZoom);
@@ -993,22 +1489,15 @@ if (select && select.value) {
         for (let d = 0; d < this.Cells.length; d++) this.Cells[d].drawOneCell(this.ctx);
         for (let d = 0; d < this.nodelist.length; d++) this.nodelist[d].drawOneCell(this.ctx);
         this.ctx.restore();
+        this.drawSplitIcon(this.ctx);
+        this.drawTouch(this.ctx);
         this.lbCanvas && this.lbCanvas.width && this.ctx.drawImage(this.lbCanvas, this.canvasWidth - this.lbCanvas.width - 10, 10);
         if (this.chatCanvas != null) this.ctx.drawImage(this.chatCanvas, 0, this.canvasHeight - this.chatCanvas.height - 50);
         this.userScore = Math.max(this.userScore, this.calcUserScore());
         let displayText = '';
         if (this.userScore > 0) {
-            displayText += 'Score: ' + ~~(this.userScore / 100);
+            displayText = 'Score: ' + ~~(this.userScore / 100);
         }
-        if (window.currentFPS > 0) {
-            if (displayText) displayText += ' | ';
-            displayText += 'FPS: ' + window.currentFPS;
-        }
-		
-if (this.ping > 0) {
-    if (displayText) displayText += '  |  ';
-    displayText += 'Ping: ' + this.ping;
-}
         if (displayText) {
             if (null == this.scoreText) {
                 this.scoreText = new UText(24, '#FFFFFF');
@@ -1096,16 +1585,41 @@ if (this.ping > 0) {
         var len = this.chatBoard.length;
         var from = len - 15;
         if (from < 0) from = 0;
-        for (var i = 0; i < (len - from); i++) {
-            var chatName = new UText(18, this.chatBoard[i + from].color);
-            chatName.setValue(this.chatBoard[i + from].name);
-            var width = chatName.getWidth();
-            var a = chatName.render();
-            ctx.drawImage(a, 15, this.chatCanvas.height / scaleFactor - 24 * (len - i - from));
-            var chatText = new UText(18, '#666666');
-            chatText.setValue(': ' + this.chatBoard[i + from].message);
-            a = chatText.render();
-            ctx.drawImage(a, 15 + width, this.chatCanvas.height / scaleFactor - 24 * (len - from - i));
+
+        const chatEntries = [];
+        for (let i = from; i < len; i++) {
+            const entry = this.chatBoard[i];
+            const chatName = new UText(CHAT_FONT_SIZE, entry.color);
+            chatName.setValue(entry.name);
+            const nameWidth = chatName.getWidth();
+            const prefixWidth = nameWidth + measureChatTextWidth(": ", CHAT_FONT_SIZE);
+            const msgLines = wrapChatMessageLines(entry.message, prefixWidth, CHAT_MAX_WIDTH, CHAT_FONT_SIZE);
+            chatEntries.push({ entry, chatName, nameWidth, msgLines });
+        }
+
+        let yCursor = this.chatCanvas.height / scaleFactor;
+        for (let e = chatEntries.length - 1; e >= 0; e--) {
+            const { chatName, nameWidth, msgLines } = chatEntries[e];
+            const blockHeight = msgLines.length * CHAT_LINE_HEIGHT;
+            yCursor -= blockHeight;
+
+            for (let li = 0; li < msgLines.length; li++) {
+                const lineY = yCursor + li * CHAT_LINE_HEIGHT;
+                if (li === 0) {
+                    const nameImg = chatName.render();
+                    ctx.drawImage(nameImg, CHAT_BASE_X, lineY);
+                    const chatText = new UText(CHAT_FONT_SIZE, "#666666");
+                    chatText.setValue(": " + msgLines[0]);
+                    const textImg = chatText.render();
+                    ctx.drawImage(textImg, CHAT_BASE_X + nameWidth, lineY);
+                } else {
+                    const chatText = new UText(CHAT_FONT_SIZE, "#666666");
+                    chatText.setValue(msgLines[li]);
+                    const textImg = chatText.render();
+                    ctx.drawImage(textImg, CHAT_BASE_X, lineY);
+                }
+            }
+            yCursor -= 4;
         }
     }
     drawLeaderBoard() {
@@ -1141,11 +1655,11 @@ if (this.ping > 0) {
         ctx.fillRect(0, 0, 200, boardLength);
         ctx.globalAlpha = 1;
         ctx.fillStyle = "#FFFFFF";
-        ctx.font = "30px Ubuntu";
+        ctx.font = canvasFont(30);
         ctx.textAlign = "center";
         ctx.fillText("Leaderboard", 100, 40);
         ctx.textAlign = "left";
-        ctx.font = "20px Ubuntu";
+        ctx.font = canvasFont(20);
         for (var i = 0; i < visible.length; i++) {
             var entry = visible[i];
             var name = entry.name || "An unnamed cell";
@@ -1209,7 +1723,7 @@ if (this.ping > 0) {
         const spiked = reader.uint8();
         const flagVirus = !!(spiked & 0x01);
         const flagAgitated = !!(spiked & 0x10);
-        const flagEjected = !!(spiked & 0x20);
+        const flagEjected = !!(spiked & 0x20) || !!(spiked & 0x40);
         
         const name = reader.utf8();
         
@@ -1237,7 +1751,7 @@ if (this.ping > 0) {
             node.ka = posX;
             node.la = posY;
             if (playerId === this.ownerPlayerId) {
-                document.getElementById("overlays").style.display = "none";
+                this.hideOverlays();
                 this.playerCells.push(node);
                 if (this.playerCells.length === 1) {
                     this.nodeX = node.x;
@@ -1406,7 +1920,7 @@ class UText {
             const value = this._value;
             const scale = this._scale;
             const fontsize = this._size;
-            const font = fontsize + "px Ubuntu";
+            const font = canvasFont(fontsize);
             // важно: сначала font
             ctx.font = font;
             const h = ~~(0.2 * fontsize);
@@ -1435,11 +1949,125 @@ class UText {
         if (!this._canvas || !this._ctx) {
             this._canvas = document.createElement("canvas");
             this._ctx = this._canvas.getContext("2d");
-            this._ctx.font = this._size + "px Ubuntu";
+            this._ctx.font = canvasFont(this._size);
         }
         return this._ctx.measureText(this._value).width + 6;
     }
 }
+
+const smoothRender = 0.4;
+const closebord = false;
+
+const Quad = {
+    init: function (args) {
+        function Node(x, y, w, h, depth) {
+            this.x = x;
+            this.y = y;
+            this.w = w;
+            this.h = h;
+            this.depth = depth;
+            this.items = [];
+            this.nodes = [];
+        }
+
+        var c = args.maxChildren || 2,
+            d = args.maxDepth || 4;
+        Node.prototype = {
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0,
+            depth: 0,
+            items: null,
+            nodes: null,
+            exists: function (selector) {
+                for (var i = 0; i < this.items.length; ++i) {
+                    var item = this.items[i];
+                    if (item.x >= selector.x && item.y >= selector.y && item.x < selector.x + selector.w && item.y < selector.y + selector.h) return true;
+                }
+                if (0 != this.nodes.length) {
+                    var self = this;
+                    return this.findOverlappingNodes(selector, function (dir) {
+                        return self.nodes[dir].exists(selector);
+                    });
+                }
+                return false;
+            },
+            retrieve: function (item, callback) {
+                for (var i = 0; i < this.items.length; ++i) callback(this.items[i]);
+                if (0 != this.nodes.length) {
+                    var self = this;
+                    this.findOverlappingNodes(item, function (dir) {
+                        self.nodes[dir].retrieve(item, callback);
+                    });
+                }
+            },
+            insert: function (a) {
+                if (0 != this.nodes.length) {
+                    this.nodes[this.findInsertNode(a)].insert(a);
+                } else {
+                    if (this.items.length >= c && this.depth < d) {
+                        this.devide();
+                        this.nodes[this.findInsertNode(a)].insert(a);
+                    } else {
+                        this.items.push(a);
+                    }
+                }
+            },
+            findInsertNode: function (a) {
+                return a.x < this.x + this.w / 2 ? a.y < this.y + this.h / 2 ? 0 : 2 : a.y < this.y + this.h / 2 ? 1 : 3;
+            },
+            findOverlappingNodes: function (a, b) {
+                return a.x < this.x + this.w / 2 && (a.y < this.y + this.h / 2 && b(0) || a.y >= this.y + this.h / 2 && b(2)) || a.x >= this.x + this.w / 2 && (a.y < this.y + this.h / 2 && b(1) || a.y >= this.y + this.h / 2 && b(3)) ? true : false;
+            },
+            devide: function () {
+                var a = this.depth + 1,
+                    c = this.w / 2,
+                    d = this.h / 2;
+                this.nodes.push(new Node(this.x, this.y, c, d, a));
+                this.nodes.push(new Node(this.x + c, this.y, c, d, a));
+                this.nodes.push(new Node(this.x, this.y + d, c, d, a));
+                this.nodes.push(new Node(this.x + c, this.y + d, c, d, a));
+                a = this.items;
+                this.items = [];
+                for (c = 0; c < a.length; c++) this.insert(a[c]);
+            },
+            clear: function () {
+                for (var a = 0; a < this.nodes.length; a++) this.nodes[a].clear();
+                this.items.length = 0;
+                this.nodes.length = 0;
+            }
+        };
+        var internalSelector = {
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0
+        };
+        return {
+            root: new Node(args.minX, args.minY, args.maxX - args.minX, args.maxY - args.minY, 0),
+            insert: function (a) {
+                this.root.insert(a);
+            },
+            retrieve: function (a, b) {
+                this.root.retrieve(a, b);
+            },
+            retrieve2: function (a, b, c, d, callback) {
+                internalSelector.x = a;
+                internalSelector.y = b;
+                internalSelector.w = c;
+                internalSelector.h = d;
+                this.root.retrieve(internalSelector, callback);
+            },
+            exists: function (a) {
+                return this.root.exists(a);
+            },
+            clear: function () {
+                this.root.clear();
+            }
+        };
+    }
+};
 
 class Cell {
     constructor(uid, ux, uy, usize, ucolor, uname) {
@@ -1460,6 +2088,10 @@ class Cell {
         this.isVirus = false;
         this.isEjected = false;
         this.isAgitated = false;
+        this.flag = 0;
+        this.points = [];
+        this.pointsAcc = [];
+        this.wasSimpleDrawing = true;
         this.setName(uname);
     }
     destroy() {
@@ -1493,6 +2125,70 @@ class Cell {
             this.sizeCache = new UText(this.getNameSize() * 0.5, "#FFFFFF", true, "#000000");
         }
         this.sizeCache.setSize(this.getNameSize() * 0.5);
+    }
+    getNumPoints() {
+        if (this.id === 0) return 16;
+        let minPoints = this.size < 20 ? 0 : 10;
+        if (this.isVirus) minPoints = 30;
+        let b = this.isVirus ? this.size : this.size * game.viewZoom;
+        b *= game.z;
+        if (this.flag & 32) b *= 0.25;
+        return ~~Math.max(b, minPoints);
+    }
+    createPoints() {
+        const numPoints = this.getNumPoints();
+        while (this.points.length > numPoints) {
+            const idx = ~~(Math.random() * this.points.length);
+            this.points.splice(idx, 1);
+            this.pointsAcc.splice(idx, 1);
+        }
+        if (!this.points.length && numPoints > 0) {
+            this.points.push({ ref: this, size: this.size, x: this.x, y: this.y });
+            this.pointsAcc.push(Math.random() - 0.5);
+        }
+        while (this.points.length < numPoints) {
+            const idx = ~~(Math.random() * this.points.length);
+            const point = this.points[idx];
+            this.points.splice(idx, 0, { ref: this, size: point.size, x: point.x, y: point.y });
+            this.pointsAcc.splice(idx, 0, this.pointsAcc[idx]);
+        }
+    }
+    movePoints() {
+        this.createPoints();
+        const pts = this.points;
+        const acc = this.pointsAcc;
+        const n = pts.length;
+        for (let i = 0; i < n; i++) {
+            const prev = acc[(i - 1 + n) % n];
+            const next = acc[(i + 1) % n];
+            acc[i] += (Math.random() - 0.5) * (this.isAgitated ? 3 : 1);
+            acc[i] = Math.max(Math.min(acc[i] * 0.7, 10), -10);
+            acc[i] = (prev + next + 8 * acc[i]) / 10;
+        }
+        const ref = this;
+        const isVirus = this.isVirus ? 0 : (this.id / 1e3 + game.timestamp / 1e4) % (2 * Math.PI);
+        for (let j = 0; j < n; j++) {
+            let f = pts[j].size;
+            const prev = pts[(j - 1 + n) % n].size;
+            const next = pts[(j + 1) % n].size;
+            if (this.size > 15 && game.qTree && this.size * game.viewZoom > 20 && this.id !== 0) {
+                const x = pts[j].x, y = pts[j].y;
+                let collide = false;
+                game.qTree.retrieve2(x - 5, y - 5, 10, 10, a => {
+                    if (a.ref !== ref && (x - a.x) ** 2 + (y - a.y) ** 2 < 625) collide = true;
+                });
+                if (!collide && (x < game.leftPos || y < game.topPos || x > game.rightPos || y > game.bottomPos)) collide = true;
+                if (collide) acc[j] = Math.max(0, acc[j]) - 1;
+            }
+            f = Math.max(0, f + acc[j]);
+            f = this.isAgitated ? (19 * f + this.size) / 20 : (12 * f + this.size) / 13;
+            pts[j].size = (prev + next + 8 * f) / 10;
+            const angle = (2 * Math.PI / n) * j;
+            let radius = pts[j].size;
+            if (this.isVirus && j % 2 === 0) radius += 5;
+            pts[j].x = this.x + Math.cos(angle + isVirus) * radius;
+            pts[j].y = this.y + Math.sin(angle + isVirus) * radius;
+        }
     }
     updatePos() {
         if (this.id === 0) return 1;
@@ -1528,41 +2224,56 @@ class Cell {
     }
     drawOneCell(ctx) {
         if (!this.shouldRender()) return;
+
+        const simpleRender = this.id !== 0 && !this.isAgitated && smoothRender > game.viewZoom || this.getNumPoints() < 10;
+
+        if (!simpleRender && this.wasSimpleDrawing) this.points.forEach(p => p.size = this.size);
+
+        let bigPointSize = this.size;
+        if (!this.wasSimpleDrawing) this.points.forEach(p => bigPointSize = Math.max(bigPointSize, p.size));
+        this.wasSimpleDrawing = simpleRender;
+
         ctx.save();
         this.drawTime = game.timestamp;
-this.updatePos();
-		let renderSize = this.size;
-if (renderSize === 0) renderSize = 20;
+        this.updatePos();
+        let renderSize = this.size;
+        if (renderSize === 0) renderSize = 20;
+
+        ctx.lineWidth = closebord ? 0 : 10;
+        ctx.lineCap = "round";
+        ctx.lineJoin = this.isVirus ? "miter" : "round";
+        ctx.fillStyle = this.color;
+        ctx.strokeStyle = simpleRender ? this.color : this.getStrokeColor();
+
         ctx.beginPath();
-ctx.arc(this.x, this.y, renderSize, 0, 2 * Math.PI);
-ctx.closePath();
+        if (simpleRender) {
+            ctx.arc(this.x, this.y, renderSize, 0, 2 * Math.PI);
+        } else {
+            this.movePoints();
+            ctx.moveTo(this.points[0].x, this.points[0].y);
+            this.points.forEach(p => ctx.lineTo(p.x, p.y));
+        }
+        ctx.closePath();
+        if (!closebord) ctx.stroke();
+        ctx.fill();
 
-// ВСЕГДА сначала красим клетку цветом
-ctx.fillStyle = this.color;
-ctx.fill();
-
-// ===== SKIN =====
-let skinImg = null;
-if (game.showSkin && this.name) {
-    skinImg = game.getSkinForNick(this.name);
-}
-
-if (skinImg) {
-    ctx.save();
-    ctx.clip(); // клип по кругу
-
-    // СКИН БЕЗ ПРОЗРАЧНОСТИ
-    ctx.drawImage(
-        skinImg,
-        this.x - renderSize,
-        this.y - renderSize,
-        renderSize * 2,
-        renderSize * 2
-    );
-
-    ctx.restore();
-}
-
+        const skinSz = simpleRender ? renderSize : bigPointSize;
+        let skinImg = null;
+        if (game.showSkin && this.name) {
+            skinImg = game.getSkinForNick(this.name);
+        }
+        if (skinImg) {
+            ctx.save();
+            ctx.clip();
+            ctx.drawImage(
+                skinImg,
+                this.x - skinSz,
+                this.y - skinSz,
+                skinSz * 2,
+                skinSz * 2
+            );
+            ctx.restore();
+        }
 
         const isPlayer = game.playerCells.includes(this);
         if (this.id !== 0) {
@@ -1571,7 +2282,6 @@ if (skinImg) {
             const nameSize = this.getNameSize();
             const scale = Math.ceil(10 * game.viewZoom) * 0.1;
             const invScale = 1 / scale;
-            // ===== NAME =====
             if ((game.showName || isPlayer) && this.name && this.nameCache) {
                 const cache = this.nameCache;
                 cache.setValue(this.name);
@@ -1582,8 +2292,7 @@ if (skinImg) {
                 const h = ~~(canvas.height * invScale);
                 ctx.drawImage(canvas, x - ~~(w / 2), y - ~~(h / 2), w, h);
             }
-            // ===== MASS =====
-            if ((game.showMass || isPlayer) && (!this.isVirus || this.isAgitated) && this.size > 100) {
+            if ((game.showMass || isPlayer) && !this.isVirus && !this.isEjected && !this.isAgitated && this.size > 100) {
                 const mass = ~~(this.size * this.size * 0.01);
                 const cache = this.sizeCache;
                 cache.setValue(mass);
@@ -1600,4 +2309,9 @@ if (skinImg) {
 }
 
 const game = new Game();
-onload = game.gameLoop.bind(game);
+onload = () => {
+    ensureCanvasFont().finally(() => {
+        invalidateCanvasTextCaches();
+        game.gameLoop();
+    });
+};
