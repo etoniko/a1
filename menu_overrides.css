@@ -189,7 +189,7 @@
 }
 
 #mainui-settings .dialog {
-    z-index: 51;
+    z-index: 100;
 }
 
 .leagues-inner-close {
