@@ -29,15 +29,17 @@ window.yaContextCb.push(() => {
         "platform": "touch"
     });
     Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-11",
-        "type": "floorAd",
-        "platform": "desktop"
+        "blockId": "R-A-17463228-6",
+        "renderTo": "yandex_rtb_R-A-17463228-6"
     });
     Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-12",
-        "type": "floorAd",
-        "platform": "touch"
-    })
+        "blockId": "R-A-17463228-7",
+        "renderTo": "yandex_rtb_R-A-17463228-7"
+    });
+    Ya.Context.AdvManager.render({
+        "blockId": "R-A-17463228-8",
+        "renderTo": "yandex_rtb_R-A-17463228-8"
+    });
 })
 </script>
 </head>
@@ -53,6 +55,15 @@ window.yaContextCb.push(() => {
 </header>
 <div id="background"></div>
 <div id="overlays">
+    <aside id="rtb-sidebar-left" class="rtb-sidebar rtb-sidebar-left">
+        <div class="rtb-ad-slot" id="yandex_rtb_R-A-17463228-6"></div>
+    </aside>
+    <aside id="rtb-sidebar-right" class="rtb-sidebar rtb-sidebar-right">
+        <div class="rtb-ad-slot" id="yandex_rtb_R-A-17463228-7"></div>
+    </aside>
+    <div id="rtb-strip-bottom" class="rtb-bottom">
+        <div class="rtb-ad-slot" id="yandex_rtb_R-A-17463228-8"></div>
+    </div>
     <div id="helloDialog">
         <div id="mainui-grid">
             <div>
@@ -307,7 +318,67 @@ function closeSettings() {
     document.getElementById('mainui-play').classList.remove('moveToTop');
 }
 
+function updateRtbLayout() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const inset = vw >= 768 ? 16 : 10;
+    const gap = 12;
+    const menuBaseW = 985;
+    const menuBaseH = 600;
+    const menuPad = 40;
+    let sideW = 0;
+    let bottomH = 0;
+
+    if (vw >= 1400) {
+        sideW = Math.min(300, Math.max(170, Math.floor((vw - menuBaseW) / 2) - 20));
+    } else if (vw >= 1100) {
+        sideW = Math.min(250, Math.max(150, Math.floor((vw - menuBaseW) / 2) - 16));
+    } else if (vw >= 900) {
+        sideW = 155;
+    }
+
+    const menuScale = Math.min(1, (vw - menuPad * 2) / menuBaseW, (vh - menuPad * 2) / menuBaseH);
+    const menuBottom = vh * 0.45 + (menuBaseH * menuScale) / 2;
+    const available = Math.floor(vh - inset - gap - menuBottom);
+
+    if (available >= 100) {
+        bottomH = Math.min(available, vw >= 768 ? 280 : 200);
+    } else if (available >= 60) {
+        bottomH = available;
+    } else {
+        bottomH = vw >= 768 ? 100 : 72;
+    }
+
+    const root = document.documentElement;
+    const menuW = Math.min(menuBaseW, vw - inset * 2);
+    const topBound = inset;
+    const bottomBound = vh - inset - bottomH - gap;
+    const zoneHeight = Math.max(0, bottomBound - topBound);
+    let sideH = Math.floor(zoneHeight * 0.96);
+    sideH = Math.min(sideH, zoneHeight);
+    sideH = Math.max(sideH, vw >= 768 ? 360 : 260);
+    if (sideH > zoneHeight) sideH = zoneHeight;
+    const sideTop = bottomBound - sideH;
+
+    root.style.setProperty('--rtb-inset', inset + 'px');
+    root.style.setProperty('--rtb-menu-width', menuW + 'px');
+    root.style.setProperty('--rtb-side-width', sideW + 'px');
+    root.style.setProperty('--rtb-side-height', sideH + 'px');
+    root.style.setProperty('--rtb-side-top', sideTop + 'px');
+    root.style.setProperty('--rtb-bottom-height', bottomH + 'px');
+
+    const left = document.getElementById('rtb-sidebar-left');
+    const right = document.getElementById('rtb-sidebar-right');
+    const showSides = sideW > 0;
+    if (left) left.classList.toggle('rtb-visible', showSides);
+    if (right) right.classList.toggle('rtb-visible', showSides);
+}
+
+window.addEventListener('resize', updateRtbLayout);
+updateRtbLayout();
+
 document.addEventListener('DOMContentLoaded', () => {
+    updateRtbLayout();
     const nickInput = document.getElementById('nick');
     const passInput = document.getElementById('pass');
     const settingsBtn = document.getElementById('settingsButton');
