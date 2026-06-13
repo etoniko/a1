@@ -222,3 +222,74 @@ header#mainui-header.hidden {
   margin: 0 6px;
   user-select: none;
 }
+
+:root {
+  --rtb-inset: 16px;
+  --rtb-menu-width: 985px;
+  --rtb-side-width: 0px;
+  --rtb-side-height: 0px;
+  --rtb-side-top: 0px;
+  --rtb-bottom-height: 0px;
+  --rtb-gap: 12px;
+}
+
+#overlays .rtb-sidebar,
+#overlays .rtb-bottom {
+  position: absolute;
+  z-index: 0;
+  background-color: #fff;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: auto;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+#overlays .rtb-sidebar {
+  top: var(--rtb-side-top);
+  bottom: auto;
+  height: var(--rtb-side-height);
+  width: var(--rtb-side-width);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+#overlays .rtb-sidebar.rtb-visible {
+  display: flex;
+}
+
+#overlays .rtb-sidebar-left {
+  left: var(--rtb-inset);
+}
+
+#overlays .rtb-sidebar-right {
+  right: var(--rtb-inset);
+}
+
+#overlays .rtb-bottom {
+  left: 50%;
+  right: auto;
+  width: var(--rtb-menu-width);
+  transform: translateX(-50%);
+  bottom: var(--rtb-inset);
+  height: var(--rtb-bottom-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#overlays .rtb-ad-slot {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+#overlays .rtb-ad-slot > * {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#overlays #helloDialog {
+  z-index: 1;
+}
