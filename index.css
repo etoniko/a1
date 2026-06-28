@@ -293,3 +293,175 @@ header#mainui-header.hidden {
 #overlays #helloDialog {
   z-index: 1;
 }
+
+/* Tournament announcement banner — light, centered */
+.tournament-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+.tournament-banner.is-hidden {
+  display: none;
+}
+
+.tournament-banner-card {
+  position: relative;
+  width: min(560px, 100%);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #d8d8d8;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  animation: tournament-banner-in 0.4s ease-out;
+}
+
+@keyframes tournament-banner-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.tournament-banner-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #666;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.tournament-banner-close:hover {
+  background: #fff;
+  border-color: #999;
+  color: #333;
+}
+
+.tournament-banner-hero {
+  background: #f4f4f4;
+  line-height: 0;
+}
+
+.tournament-banner-hero img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+.tournament-banner-body {
+  padding: 16px 20px 20px;
+  text-align: center;
+  color: #343434;
+  background: #fff;
+}
+
+.tournament-banner-desc,
+.tournament-banner-prize {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #5a5a5a;
+  font-weight: 400;
+}
+
+.tournament-banner-desc strong {
+  color: #222;
+  font-weight: 700;
+}
+
+.tournament-banner-prize {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #7d7d7d;
+}
+
+.tournament-banner-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.tournament-banner .btn-play.tournament-banner-apply {
+  position: static;
+  top: auto;
+  display: block;
+  width: 243px;
+  max-width: 100%;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 34px;
+  text-align: center;
+  text-decoration: none;
+  color: #fff;
+  background-color: #54c800;
+  border: 1px solid #54c800;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.tournament-banner .btn-play.tournament-banner-apply:hover,
+.tournament-banner .btn-play.tournament-banner-apply:focus {
+  text-decoration: none;
+  color: #fff;
+  background-color: #347f01;
+  border-color: #347f01;
+}
+
+.tournament-banner-links {
+  font-size: 13px;
+  color: #7d7d7d;
+}
+
+.tournament-banner-links a {
+  color: #428bca;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.tournament-banner-links a:hover {
+  text-decoration: underline;
+}
+
+.tournament-banner-links span {
+  margin: 0 6px;
+  color: #bbb;
+}
+
+@media (max-width: 480px) {
+  .tournament-banner-body {
+    padding: 12px 14px 16px;
+  }
+  .tournament-banner .btn-play.tournament-banner-apply {
+    width: 100%;
+    font-size: 18px;
+  }
+}
