@@ -11,7 +11,7 @@
     <meta name="yandex-verification" content="d2648e3bc2d73129" />
 	<link rel="canonical" href="https://агарио.рф">
     <link rel="preload" href="https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf" as="font" type="font/ttf" crossorigin>
-    <link href="./index.css?1" rel="stylesheet">
+    <link href="./index.css?6" rel="stylesheet">
     <script src="./main_out.js?2"></script>
     <link id="favicon" rel="icon" type="image/png" href="favicon.png">
 	<!-- Yandex.RTB -->
@@ -63,6 +63,26 @@ window.yaContextCb.push(() => {
     </aside>
     <div id="rtb-strip-bottom" class="rtb-bottom">
         <div class="rtb-ad-slot" id="yandex_rtb_R-A-17463228-8"></div>
+    </div>
+    <div id="tournament-banner" class="tournament-banner" role="dialog" aria-label="Турнир Agar.su">
+        <div class="tournament-banner-card">
+            <button type="button" class="tournament-banner-close" id="tournament-banner-close" aria-label="Закрыть">×</button>
+            <div class="tournament-banner-hero">
+                <img src="./img/tournament/banner.png" alt="Agar.su Tournament 1vs1 FFA">
+            </div>
+            <div class="tournament-banner-body">
+                <p class="tournament-banner-desc">Идёт набор на турнир · стартовая масса <strong>10к</strong> · денежные призы</p>
+                <p class="tournament-banner-prize">Подробности в Telegram и VK</p>
+                <div class="tournament-banner-actions">
+                    <a class="btn btn-play tournament-banner-apply" href="https://agar.su/tournament/send" target="_blank" rel="noopener noreferrer">Подать заявку</a>
+                    <div class="tournament-banner-links">
+                        <a href="https://t.me/agarsu" target="_blank" rel="noopener noreferrer">t.me/agarsu</a>
+                        <span>·</span>
+                        <a href="https://vk.com/agario" target="_blank" rel="noopener noreferrer">vk.com/agario</a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     <div id="helloDialog">
         <div id="mainui-grid">
@@ -380,6 +400,19 @@ updateRtbLayout();
 
 document.addEventListener('DOMContentLoaded', () => {
     updateRtbLayout();
+
+    const tournamentBanner = document.getElementById('tournament-banner');
+    const tournamentBannerClose = document.getElementById('tournament-banner-close');
+    if (tournamentBanner && tournamentBannerClose) {
+        if (sessionStorage.getItem('tournamentBannerClosed') === '1') {
+            tournamentBanner.classList.add('is-hidden');
+        }
+        tournamentBannerClose.addEventListener('click', () => {
+            tournamentBanner.classList.add('is-hidden');
+            sessionStorage.setItem('tournamentBannerClosed', '1');
+        });
+    }
+
     const nickInput = document.getElementById('nick');
     const passInput = document.getElementById('pass');
     const settingsBtn = document.getElementById('settingsButton');
