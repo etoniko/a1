@@ -278,6 +278,7 @@ function initHelloDialogScale() {
 }
 
 const SERVERS = {
+	ffa2: "ffa.agar.su:6003",
     ffa: "ffa.agar.su",
     ms: "ffa.agar.su:6002",
     pvp1: "ffa.agar.su:6004",
@@ -291,7 +292,7 @@ function resolveServerUrl(arg) {
 
 function resolveServerKey(urlOrKey) {
     if (SERVERS[urlOrKey]) return urlOrKey;
-    return Object.keys(SERVERS).find(k => SERVERS[k] === urlOrKey) || "ffa";
+    return Object.keys(SERVERS).find(k => SERVERS[k] === urlOrKey) || "ffa2";
 }
 
 function syncGamemodeUI(urlOrKey) {
@@ -570,7 +571,7 @@ setSpect() {
     }
     initServersFromHash(reconnect) {
         const rawHash = location.hash.slice(1).split("?")[0];
-        const hash = rawHash || "ffa";
+        const hash = rawHash || "ffa2";
         let url = SERVERS[hash] || null;
         if (!url) url = SERVERS.ffa;
         syncGamemodeUI(hash);
