@@ -483,7 +483,7 @@ class Game {
 	
 	async loadSkinList() {
     try {
-        const res = await fetch("https://agar.su/skinlist.txt");
+        const res = await fetch("https://api.agar.su/skinlist.txt");
         const text = await res.text();
 
 text.split("\n").forEach(line => {
@@ -519,7 +519,7 @@ getSkinForNick(nick) {
     if (this.skinLoading[code]) return null;
 
     const img = new Image();
-    img.src = "https://agar.su/skins/" + code + ".png";
+    img.src = "https://api.agar.su/skins/" + code + ".png";
 
     this.skinLoading[code] = true;
 
