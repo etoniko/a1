@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Агарио — играть</title>
+    <meta name="robots" content="noindex, follow">
+    <link rel="canonical" href="https://агарио.рф/play/">
+    <!--
+      Внутренняя страница /play/ нужна для desktop fullscreen РСЯ
+      («показ при переходе между страницами»). Контент — тот же index.html.
+    -->
+    <script>
+    (async function () {
+        try {
+            var res = await fetch("../index.html", { cache: "no-cache" });
+            var html = await res.text();
+            if (!/<base\s/i.test(html)) {
+                html = html.replace(/<head([^>]*)>/i, '<head$1><base href="../">');
+            }
+            document.open();
+            document.write(html);
+            document.close();
+        } catch (e) {
+            document.body.innerHTML =
+                '<p style="font-family:sans-serif;text-align:center;margin-top:30vh">' +
+                "Не удалось загрузить игру. Откройте <a href=\"../\">агарио.рф</a></p>";
+            console.error(e);
+        }
+    })();
+    </script>
+</head>
+<body>
+    <p style="font-family:sans-serif;text-align:center;margin-top:40vh;color:#666">Загрузка…</p>
+</body>
+</html>

@@ -12,36 +12,12 @@
 	<link rel="canonical" href="https://агарио.рф">
     <link rel="preload" href="https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf" as="font" type="font/ttf" crossorigin>
     <link href="./index.css?7" rel="stylesheet">
-    <script src="./main_out.js?11"></script>
+    <script src="./main_out.js?12"></script>
     <link id="favicon" rel="icon" type="image/png" href="favicon.png">
-	<!-- Yandex.RTB -->
-<script>window.yaContextCb=window.yaContextCb||[]</script>
-<script src="https://yandex.ru/ads/system/context.js" async></script>
-<script>
-window.yaContextCb.push(() => {
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-9",
-        "renderTo": "yandex_rtb_R-A-17463228-9"
-    });
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-4",
-        "type": "fullscreen",
-        "platform": "touch"
-    });
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-6",
-        "renderTo": "yandex_rtb_R-A-17463228-6"
-    });
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-7",
-        "renderTo": "yandex_rtb_R-A-17463228-7"
-    });
-    Ya.Context.AdvManager.render({
-        "blockId": "R-A-17463228-8",
-        "renderTo": "yandex_rtb_R-A-17463228-8"
-    });
-})
-</script>
+    <!-- Yandex.RTB: ID блоков задаются в rtb-ads.js (AGAR_RSYA) -->
+    <script>window.yaContextCb = window.yaContextCb || [];</script>
+    <script src="https://yandex.ru/ads/system/context.js" async></script>
+    <script src="./rtb-ads.js?1"></script>
 </head>
 <body>
 <header id="mainui-header">
@@ -56,13 +32,13 @@ window.yaContextCb.push(() => {
 <div id="background"></div>
 <div id="overlays">
     <aside id="rtb-sidebar-left" class="rtb-sidebar rtb-sidebar-left">
-        <div class="rtb-ad-slot" id="yandex_rtb_R-A-17463228-6"></div>
+        <div class="rtb-ad-slot" id="yandex_rtb_sidebar_left"></div>
     </aside>
     <aside id="rtb-sidebar-right" class="rtb-sidebar rtb-sidebar-right">
-        <div class="rtb-ad-slot" id="yandex_rtb_R-A-17463228-7"></div>
+        <div class="rtb-ad-slot" id="yandex_rtb_sidebar_right"></div>
     </aside>
     <div id="rtb-strip-bottom" class="rtb-bottom">
-        <div class="rtb-ad-slot" id="yandex_rtb_R-A-17463228-8"></div>
+        <div class="rtb-ad-slot" id="yandex_rtb_strip_bottom"></div>
     </div>
     <div id="helloDialog">
         <div id="mainui-grid">
@@ -252,7 +228,7 @@ window.yaContextCb.push(() => {
                     </div>
                 </div>
                 <div id="mainui-ads">
-                    <div id="yandex_rtb_R-A-17463228-9" style="z-index: 0;"></div>
+                    <div id="yandex_rtb_banner_menu" style="z-index: 0;"></div>
                 </div>
             </div>
             <div>

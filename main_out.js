@@ -1756,6 +1756,9 @@ setSpect() {
                 if (this.playerCells.length === 1) {
                     this.nodeX = node.x;
                     this.nodeY = node.y;
+                    if (window.AgarAds && typeof window.AgarAds.onPlayerSpawn === "function") {
+                        window.AgarAds.onPlayerSpawn();
+                    }
                 }
             }
         }
@@ -1812,6 +1815,9 @@ setSpect() {
     
     if (this.ua && this.playerCells.length === 0) {
         this.showOverlays(false);
+        if (window.AgarAds && typeof window.AgarAds.onPlayerDeath === "function") {
+            window.AgarAds.onPlayerDeath();
+        }
     }
 }
     onUpdateXp(xp) {
