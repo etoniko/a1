@@ -44,6 +44,20 @@
         }[c]));
     }
 
+    const TOKEN_KEY = "accountToken";
+    const VK_APP = 54069355;
+    const VK_REDIRECT = "https://agar.su";
+
+    function getAccountToken() {
+        try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
+    }
+    function setAccountToken(token) {
+        try {
+            if (token) localStorage.setItem(TOKEN_KEY, token);
+            else localStorage.removeItem(TOKEN_KEY);
+        } catch (e) { /* ignore */ }
+    }
+
     const el = {
         root: null,
         nick: null,
@@ -54,15 +68,23 @@
         statLvl: null,
         statUid: null,
         ratingList: null,
-        skinsGrid: null
+        skinsGrid: null,
+        authGuest: null,
+        authUser: null,
+        authAvatar: null,
+        authName: null,
+        authMeta: null
     };
 
     let state = {
         xp: 0,
         uid: null,
+        accountName: null,
+        accountAvatar: null,
         tab: "profile",
         skinMap: null,
         rating: null,
+        vkReady: false,
         selectedSkin: localStorage.getItem("cabinetSkin") || ""
     };
 
@@ -147,11 +169,18 @@
         if (code) {
             wrap.style.backgroundImage = "url('" + skinUrl(code) + "')";
             btn.classList.add("has-skin");
-            if (el.avatar) el.avatar.style.backgroundImage = "url('" + skinUrl(code) + "')";
         } else {
             wrap.style.backgroundImage = "";
             btn.classList.remove("has-skin");
-            if (el.avatar) el.avatar.style.backgroundImage = "";
+        }
+        if (el.avatar) {
+            if (state.accountAvatar) {
+                el.avatar.style.backgroundImage = "url('" + state.accountAvatar.replace(/'/g, "%27") + "')";
+            } else if (code) {
+                el.avatar.style.backgroundImage = "url('" + skinUrl(code) + "')";
+            } else {
+                el.avatar.style.backgroundImage = "";
+            }
         }
     }
 
@@ -173,9 +202,164 @@
         if (el.statUid) el.statUid.textContent = state.uid != null ? String(state.uid) : "—";
 
         const uname = $(".user-name");
-        if (uname) uname.textContent = currentNick();
-        if (el.nick) el.nick.textContent = currentNick();
+        const displayName = state.accountName || currentNick();
+        if (uname) uname.textContent = displayName;
+        if (el.nick) el.nick.textContent = displayName;
+        if (el.avatar && state.accountAvatar) {
+            el.avatar.style.backgroundImage = "url('" + state.accountAvatar.replace(/'/g, "%27") + "')";
+        }
+        updateAuthUi();
         updateHomeSkinPreview();
+    }
+
+    function updateAuthUi() {
+        const logged = !!getAccountToken();
+        if (el.authGuest) el.authGuest.hidden = logged;
+        if (el.authUser) el.authUser.hidden = !logged;
+        if (!logged) return;
+        if (el.authName) el.authName.textContent = state.accountName || "Игрок";
+        if (el.authMeta) el.authMeta.textContent = "ID " + (state.uid != null ? state.uid : "—");
+        if (el.authAvatar && state.accountAvatar) el.authAvatar.src = state.accountAvatar;
+    }
+
+    async function loadAccountProfile() {
+        const token = getAccountToken();
+        if (!token) {
+            state.accountName = null;
+            state.accountAvatar = null;
+            state.uid = null;
+            updateAuthUi();
+            return;
+        }
+        try {
+            const res = await fetch("https://api.agar.su/api/me/login", {
+                headers: { Authorization: "Game " + token },
+                cache: "no-store"
+            });
+            const data = await res.json();
+            if (data.error || data.status === 401) {
+                setAccountToken("");
+                state.accountName = null;
+                state.accountAvatar = null;
+                state.uid = null;
+                updateAuthUi();
+                return;
+            }
+            state.accountName = data.account_name || null;
+            state.accountAvatar = data.account_avatar || null;
+            state.uid = data.uid != null ? data.uid : null;
+            if (data.xp != null) updateXpUi(data.xp);
+            else updateAuthUi();
+        } catch (e) {
+            updateAuthUi();
+        }
+    }
+
+    function logoutAccount() {
+        setAccountToken("");
+        state.accountName = null;
+        state.accountAvatar = null;
+        state.uid = null;
+        updateXpUi(state.xp);
+        updateAuthUi();
+        initVkAuth(true);
+    }
+
+    async function completeVkLogin(payload) {
+        if (!payload || !payload.code || !payload.device_id) {
+            alert("VK: не получен код авторизации");
+            return;
+        }
+        try {
+            const res = await fetch("https://api.agar.su/api/auth/vk", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.error || !data.token) {
+                alert(data.error || "Ошибка авторизации");
+                return;
+            }
+            setAccountToken(data.token);
+            await loadAccountProfile();
+            openCabinet("profile");
+        } catch (e) {
+            alert("Ошибка сети при авторизации");
+        }
+    }
+
+    function initVkAuth(force) {
+        if (!("VKIDSDK" in window)) return;
+        const container = document.getElementById("VkIdSdkOAuthList");
+        if (!container) return;
+        if (getAccountToken() && !force) {
+            updateAuthUi();
+            return;
+        }
+        if (state.vkReady && !force) return;
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("code") && params.get("device_id")) {
+            const cv = sessionStorage.getItem("vk_code_verifier");
+            const st = sessionStorage.getItem("vk_state");
+            if (cv && st) {
+                completeVkLogin({
+                    code: params.get("code"),
+                    device_id: params.get("device_id"),
+                    code_verifier: cv,
+                    state: st
+                });
+            }
+            window.history.replaceState({}, "", window.location.pathname + window.location.hash);
+        }
+
+        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
+        const rnd = (n) => {
+            const b = new Uint8Array(n);
+            crypto.getRandomValues(b);
+            let s = "";
+            for (let i = 0; i < n; i++) s += chars[b[i] % chars.length];
+            return s;
+        };
+        const codeVerifier = rnd(64);
+        const stateStr = rnd(32);
+        sessionStorage.setItem("vk_code_verifier", codeVerifier);
+        sessionStorage.setItem("vk_state", stateStr);
+
+        const VKID = window.VKIDSDK;
+        try {
+            VKID.Config.init({
+                app: VK_APP,
+                redirectUrl: VK_REDIRECT,
+                state: stateStr,
+                codeVerifier,
+                responseMode: VKID.ConfigResponseMode.Callback,
+                source: VKID.ConfigSource.LOWCODE,
+                scope: ""
+            });
+            container.innerHTML = "";
+            const oauthList = [VKID.OAuthName.VK, VKID.OAuthName.MAIL, VKID.OAuthName.OK];
+            new VKID.OAuthList().render({
+                container,
+                oauthList,
+                scheme: VKID.Scheme.LIGHT,
+                lang: VKID.Languages.RUS,
+                styles: { height: 44, borderRadius: 10 }
+            }).on(VKID.WidgetEvents.ERROR, (err) => {
+                console.error("VK ID error", err);
+            }).on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, (payload) => {
+                completeVkLogin({
+                    code: payload.code,
+                    device_id: payload.device_id,
+                    code_verifier: codeVerifier,
+                    state: stateStr
+                });
+            });
+            state.vkReady = true;
+        } catch (e) {
+            console.error("VK ID init failed", e);
+        }
     }
 
     async function renderRating() {
@@ -205,14 +389,12 @@
             if (!/^https?:\/\//i.test(av)) av = SKIN_FALLBACK;
             return '<li>' +
                 '<div class="cab-rating-pos">' + escapeHtml(String(pos)) + "</div>" +
-                '<div class="cab-rating-who">' +
                 '<div class="cab-rating-av" style="background-image:url(\'' + av.replace(/'/g, "%27") + "')\"></div>" +
                 '<div class="cab-rating-meta">' +
                 '<div class="cab-rating-name">' + escapeHtml(name) + "</div>" +
-                '<div class="cab-rating-id">UID ' + escapeHtml(String(uid)) + "</div>" +
-                "</div></div>" +
+                '<div class="cab-rating-id">ID ' + escapeHtml(String(uid)) + "</div>" +
+                "</div>" +
                 '<div class="cab-rating-lvl">' + lvl + "</div>" +
-                '<div class="cab-rating-uid">' + escapeHtml(String(uid)) + "</div>" +
                 "</li>";
         }).join("");
     }
@@ -362,11 +544,16 @@
         if (s.rot.checked) formData.append("rotation", "1");
         if (file) formData.append("image", file, file.name);
 
+        const headers = {};
+        const token = getAccountToken();
+        if (token) headers.Authorization = "Game " + token;
+
         s.buy.disabled = true;
         shopMsg("Создаём платёж…", true);
         try {
             const res = await fetch("https://api.agar.su/create-payment", {
                 method: "POST",
+                headers,
                 body: formData
             });
             const data = await res.json().catch(() => ({}));
@@ -538,6 +725,11 @@
         el.statUid = $("#cabinetStatUid", el.root);
         el.ratingList = $("#cabinetRatingList", el.root);
         el.skinsGrid = $("#cabinetSkinsGrid", el.root);
+        el.authGuest = $("#cabAuthGuest", el.root);
+        el.authUser = $("#cabAuthUser", el.root);
+        el.authAvatar = $("#cabAuthAvatar", el.root);
+        el.authName = $("#cabAuthName", el.root);
+        el.authMeta = $("#cabAuthMeta", el.root);
 
         $(".cabinet-close", el.root).addEventListener("click", closeCabinet);
         el.root.addEventListener("click", (e) => {
@@ -549,6 +741,8 @@
         $all(".cabinet-tab", el.root).forEach((btn) => {
             btn.addEventListener("click", () => setTab(btn.dataset.tab));
         });
+        const logoutBtn = $("#cabLogoutBtn", el.root);
+        if (logoutBtn) logoutBtn.addEventListener("click", logoutAccount);
         if (el.skinsGrid) {
             el.skinsGrid.addEventListener("click", (e) => {
                 const btn = e.target.closest(".cabinet-skin");
@@ -570,6 +764,11 @@
         bindOpeners();
         bindNickSkin();
         ensureSkinMap();
+        window.onVkAuth = completeVkLogin;
+        const bootVk = () => initVkAuth(false);
+        if ("VKIDSDK" in window) bootVk();
+        else document.querySelector('script[src*="@vkid/sdk"]')?.addEventListener("load", bootVk);
+        loadAccountProfile();
         updateXpUi(0);
         setTab("profile");
 

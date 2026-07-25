@@ -12,9 +12,10 @@
 	<link rel="canonical" href="https://агарио.рф/play/">
     <link rel="preload" href="https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf" as="font" type="font/ttf" crossorigin>
     <link href="./index.css?9" rel="stylesheet">
-    <link href="./cabinet.css?3" rel="stylesheet">
+    <link href="./cabinet.css?4" rel="stylesheet">
     <script src="./antimat.js?2"></script>
     <script src="./main_out.js?16"></script>
+    <script src="https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js"></script>
     <link id="favicon" rel="icon" type="image/png" href="favicon.png">
     <!-- Yandex.RTB: ID блоков задаются в rtb-ads.js (AGAR_RSYA) -->
     <script>window.yaContextCb = window.yaContextCb || [];</script>
@@ -493,50 +494,51 @@ document.addEventListener('DOMContentLoaded', () => {
         </nav>
         <div class="cabinet-body">
             <section id="cab-profile" class="cabinet-section is-active">
+                <div class="cabinet-card" id="cabAuthCard">
+                    <div class="cab-auth" id="cabAuthGuest">
+                        <p class="cab-auth-title">Вход в ЛК</p>
+                        <p class="cab-auth-hint">VK · OK · Mail.ru</p>
+                        <div id="vkAuthContainer">
+                            <div id="VkIdSdkOAuthList"></div>
+                        </div>
+                    </div>
+                    <div class="cab-auth-user" id="cabAuthUser" hidden>
+                        <img id="cabAuthAvatar" src="https://api.agar.su/skins/4.png" alt="">
+                        <div class="meta">
+                            <div class="name" id="cabAuthName">—</div>
+                            <div class="sub" id="cabAuthMeta">ID —</div>
+                        </div>
+                        <button type="button" class="cabinet-btn gray" id="cabLogoutBtn">Выйти</button>
+                    </div>
+                </div>
                 <div class="cabinet-card">
-                    <h3>Прогресс</h3>
-                    <p class="cabinet-muted">XP копится в игре. Уровень — как на agar.su.</p>
-                    <div class="cabinet-stats" style="margin-top:12px">
+                    <div class="cabinet-stats" style="margin-top:0">
                         <div class="cabinet-stat"><b id="cabinetStatXp">0</b><span>XP</span></div>
                         <div class="cabinet-stat"><b id="cabinetStatLvl">0</b><span>Уровень</span></div>
                         <div class="cabinet-stat"><b id="cabinetStatUid">—</b><span>ID</span></div>
                     </div>
                 </div>
-                <div class="cabinet-card">
-                    <h3>Быстрые действия</h3>
-                    <div class="cabinet-actions">
-                        <button type="button" class="cabinet-btn" onclick="AgarCabinet.open('skins')">Мои скины</button>
-                        <button type="button" class="cabinet-btn blue" onclick="AgarCabinet.open('rating')">Рейтинг</button>
-                        <button type="button" class="cabinet-btn gold" onclick="AgarCabinet.open('shop')">Магазин</button>
-                    </div>
-                </div>
             </section>
             <section id="cab-rating" class="cabinet-section">
                 <div class="cabinet-card">
-                    <h3>Лучшие игроки</h3>
-                    <p class="cabinet-muted" style="margin-bottom:12px">Топ-100 аккаунтов по XP (stats).</p>
-                    <div class="cab-rating-head">
-                        <div>#</div>
-                        <div>Игрок</div>
-                        <div>LVL</div>
-                        <div>ID</div>
-                    </div>
+                    <h3>Рейтинг</h3>
+                    <p class="cabinet-muted" style="margin-bottom:8px">Топ-100 по XP</p>
                     <ul class="cab-rating-list" id="cabinetRatingList">
-                        <li class="cabinet-skin-empty" style="display:block;grid-column:1/-1">Загрузка…</li>
+                        <li class="cabinet-skin-empty" style="display:block">Загрузка…</li>
                     </ul>
                 </div>
             </section>
             <section id="cab-skins" class="cabinet-section">
                 <div class="cabinet-card">
                     <h3>Скины</h3>
-                    <p class="cabinet-muted" style="margin-bottom:12px">Только ники, под которыми ты уже играл и у которых есть скин.</p>
+                    <p class="cabinet-muted" style="margin-bottom:10px">Ники, под которыми ты играл</p>
                     <div class="cabinet-skins-grid" id="cabinetSkinsGrid"></div>
                 </div>
             </section>
             <section id="cab-shop" class="cabinet-section">
                 <div class="cabinet-card">
-                    <h3>Магазин лички</h3>
-                    <p class="cabinet-muted" style="margin-bottom:12px">Скин, пароль, невидимость и поворот — как в клиенте agar.su.</p>
+                    <h3>Магазин</h3>
+                    <p class="cabinet-muted" style="margin-bottom:10px">Скин, пароль, невидимость, поворот</p>
                     <div class="cab-shop">
                         <div>
                             <form id="cabPaymentForm" autocomplete="off">
@@ -586,6 +588,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 </div>
-<script src="./cabinet.js?3"></script>
+<script src="./cabinet.js?4"></script>
 </body>
 </html>
