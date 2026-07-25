@@ -1631,6 +1631,31 @@ setSpect() {
             yCursor -= 4;
         }
     }
+    lbStarColor(level) {
+        if (level >= 200) return "#222222";
+        if (level >= 150) return "#FFFFFF";
+        if (level >= 100) return "#FF3030";
+        if (level >= 50) return "#00FFE5";
+        return "#FFD700";
+    }
+    lbLevelTextColor(level) {
+        if (level >= 200) return "#FFFFFF";
+        if (level >= 100 && level < 150) return "#FFD700";
+        return "#444444";
+    }
+    drawLbStar(ctx, cx, cy, outerR, innerR) {
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+            const r = i % 2 === 0 ? outerR : innerR;
+            const a = -Math.PI / 2 + i * Math.PI / 5;
+            const x = cx + Math.cos(a) * r;
+            const y = cy + Math.sin(a) * r;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+    }
     drawLeaderBoard() {
         this.lbCanvas = null;
         if (this.leaderBoard.length === 0) return;
@@ -1654,21 +1679,21 @@ setSpect() {
                 xp: myEntry?.xp ?? 0
             });
         }
-        boardLength += 24 * visible.length;
+        boardLength += 26 * visible.length;
         var scale = Math.min(0.22 * this.canvasHeight, Math.min(200, 0.3 * this.canvasWidth)) * 0.005;
-        this.lbCanvas.width = 200 * scale;
+        this.lbCanvas.width = 230 * scale;
         this.lbCanvas.height = boardLength * scale;
         ctx.scale(scale, scale);
         ctx.globalAlpha = 0.4;
         ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, 200, boardLength);
+        ctx.fillRect(0, 0, 230, boardLength);
         ctx.globalAlpha = 1;
         ctx.fillStyle = "#FFFFFF";
         ctx.font = canvasFont(30);
         ctx.textAlign = "center";
-        ctx.fillText("Leaderboard", 100, 40);
+        ctx.fillText("Leaderboard", 115, 40);
         ctx.textAlign = "left";
-        ctx.font = canvasFont(20);
+        ctx.font = canvasFont(18);
         for (var i = 0; i < visible.length; i++) {
             var entry = visible[i];
             var name = entry.name || "An unnamed cell";
@@ -1677,14 +1702,35 @@ setSpect() {
             if (isMe && this.playerCells[0]?.name) {
                 name = this.playerCells[0].name;
             }
+            var y = 70 + 26 * i;
+            var rankNum = (isMe && myRank > 10 && i === visible.length - 1) ? myRank : (i + 1);
+            var rankLabel = (!this.noRanking ? rankNum + ". " : "");
             ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
-            var text = (!this.noRanking ? (i + 1) + ". " : "") + name;
-            if (isMe && myRank > 10 && i === visible.length - 1) {
-                text = myRank + ". " + name;
+            ctx.fillText(rankLabel, 8, y);
+
+            var level = entry.level;
+            var nameX = 8 + ctx.measureText(rankLabel).width + 2;
+            if (level != null && level >= 0) {
+                var cx = nameX + 9;
+                var cy = y - 5;
+                ctx.fillStyle = this.lbStarColor(level);
+                this.drawLbStar(ctx, cx, cy, 9, 4);
+                ctx.font = "bold 9px Ubuntu,sans-serif";
+                ctx.fillStyle = this.lbLevelTextColor(level);
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(String(level), cx, cy + 0.5);
+                ctx.textBaseline = "alphabetic";
+                ctx.textAlign = "left";
+                nameX += 24;
             }
-            var w = ctx.measureText(text).width;
-            var x = (w > 190) ? 5 : 100 - w / 2;
-            ctx.fillText(text, x, 70 + 24 * i);
+            ctx.font = canvasFont(18);
+            ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
+            var maxW = 220 - nameX;
+            while (name.length > 1 && ctx.measureText(name).width > maxW) {
+                name = name.slice(0, -1);
+            }
+            ctx.fillText(name, nameX, y);
         }
         if (window.AgarCabinet && document.getElementById("cabinet")?.classList.contains("is-open")) {
             window.AgarCabinet.refresh();
