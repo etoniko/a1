@@ -1713,44 +1713,61 @@ setSpect() {
         ctx.textAlign = "left";
     }
     findMyLeaderboardIndex() {
-        if (!this.playerCells.length || !this.leaderBoard.length) return -1;
+        if (!this.leaderBoard.length) return -1;
+        const myPid = this.ownerPlayerId | 0;
         const myIds = new Set(this.playerCells.map((c) => c.id));
-        for (let i = 0; i < this.leaderBoard.length; i++) {
-            const id = this.leaderBoard[i].id;
-            if (id != null && myIds.has(id)) {
-                this._myLbNodeId = id;
-                return i;
-            }
-        }
-        // Fallback: same nick (client does this for custom LB / edge cases)
-        const myName = String(this.playerCells[0]?.name || "").trim().toLowerCase();
-        if (myName) {
+
+        // 1) Stable match by my player id (pID / ownerPlayerId) — like "мой id"
+        if (myPid > 0) {
             for (let i = 0; i < this.leaderBoard.length; i++) {
-                const n = String(this.leaderBoard[i].name || "").trim().toLowerCase();
-                if (n && n === myName) {
-                    if (this.leaderBoard[i].id != null) this._myLbNodeId = this.leaderBoard[i].id;
+                if (this.leaderBoard[i].id === myPid) {
+                    this._myLbNodeId = myPid;
                     return i;
                 }
             }
         }
-        // Keep highlight across brief LB/cell-id desync after split/merge
-        if (this._myLbNodeId != null) {
+        // 2) Classic client match: any of my cell node ids
+        if (myIds.size) {
             for (let i = 0; i < this.leaderBoard.length; i++) {
-                if (this.leaderBoard[i].id === this._myLbNodeId) return i;
+                const id = this.leaderBoard[i].id;
+                if (id != null && myIds.has(id)) {
+                    this._myLbNodeId = id;
+                    return i;
+                }
+            }
+        }
+        // 3) Custom LB / name fallback (client noRanking path)
+        if (this.playerCells.length) {
+            const myName = String(this.playerCells[0]?.name || "").trim().toLowerCase();
+            if (myName) {
+                for (let i = 0; i < this.leaderBoard.length; i++) {
+                    const n = String(this.leaderBoard[i].name || "").trim().toLowerCase();
+                    if (n && n === myName) {
+                        if (this.leaderBoard[i].id != null) this._myLbNodeId = this.leaderBoard[i].id;
+                        return i;
+                    }
+                }
             }
         }
         return -1;
     }
     isMyLeaderboardEntry(entry, myRank, rowIndex, visibleLen) {
         if (!entry) return false;
-        // Extra "me" row outside top-10 is always self
         if (myRank > 10 && rowIndex === visibleLen - 1) return true;
-        if (!this.playerCells.length) return false;
-        if (entry.id != null && this.playerCells.some((c) => c.id === entry.id)) return true;
-        if (this._myLbNodeId != null && entry.id === this._myLbNodeId) return true;
-        const myName = String(this.playerCells[0]?.name || "").trim().toLowerCase();
-        const n = String(entry.name || "").trim().toLowerCase();
-        return !!(myName && n && myName === n);
+        if (entry._isMe) return true;
+        const id = entry.id;
+        if (id == null) {
+            if (this.noRanking && this.playerCells[0]?.name) {
+                return String(entry.name || "").trim().toLowerCase() ===
+                    String(this.playerCells[0].name).trim().toLowerCase();
+            }
+            return false;
+        }
+        // Primary: my player id from packet 64
+        if ((this.ownerPlayerId | 0) > 0 && id === this.ownerPlayerId) return true;
+        // Classic: any owned cell node id
+        if (this.playerCells.some((c) => c.id === id)) return true;
+        return false;
     }
     drawLeaderBoard() {
         this.lbCanvas = null;
@@ -1766,10 +1783,9 @@ setSpect() {
             var myLvl = (myEntry && myEntry.level != null && myEntry.level >= 0)
                 ? myEntry.level
                 : this.lbMyLevel();
-            // Keep LB cell id so pink highlight stays tied by id (like client)
             visible.push({
                 name: this.playerCells[0]?.name || myEntry?.name,
-                id: myEntry?.id ?? this.playerCells[0]?.id ?? this._myLbNodeId ?? null,
+                id: myEntry?.id ?? this.ownerPlayerId ?? null,
                 level: myLvl,
                 xp: myEntry?.xp ?? this.accountXp ?? 0,
                 _isMe: true
@@ -1794,7 +1810,7 @@ setSpect() {
             var entry = visible[i];
             var name = entry.name || "An unnamed cell";
             if (!this.showName) name = "An unnamed cell";
-            var isMe = entry._isMe || this.isMyLeaderboardEntry(entry, myRank, i, visible.length);
+            var isMe = this.isMyLeaderboardEntry(entry, myRank, i, visible.length);
             if (isMe && this.playerCells[0]?.name) {
                 name = this.playerCells[0].name;
             }
