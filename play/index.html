@@ -12,7 +12,7 @@
 	<link rel="canonical" href="https://агарио.рф/play/">
     <link rel="preload" href="https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf" as="font" type="font/ttf" crossorigin>
     <link href="./index.css?9" rel="stylesheet">
-    <link href="./cabinet.css?2" rel="stylesheet">
+    <link href="./cabinet.css?3" rel="stylesheet">
     <script src="./antimat.js?2"></script>
     <script src="./main_out.js?16"></script>
     <link id="favicon" rel="icon" type="image/png" href="favicon.png">
@@ -470,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <div id="cabinet" class="cabinet" aria-hidden="true">
-    <div class="cabinet-panel" role="dialog" aria-label="Личный кабинет">
+    <div class="cabinet-panel" role="dialog" aria-label="Меню">
         <button type="button" class="cabinet-close" aria-label="Закрыть">&times;</button>
         <div class="cabinet-head">
             <div class="cabinet-avatar" id="cabinetAvatar"></div>
@@ -487,79 +487,105 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <nav class="cabinet-tabs">
             <button type="button" class="cabinet-tab is-active" data-tab="profile">Профиль</button>
-            <button type="button" class="cabinet-tab" data-tab="leaderboard">Лидерборд</button>
+            <button type="button" class="cabinet-tab" data-tab="rating">Рейтинг</button>
             <button type="button" class="cabinet-tab" data-tab="skins">Скины</button>
-            <button type="button" class="cabinet-tab" data-tab="donate">Донат</button>
+            <button type="button" class="cabinet-tab" data-tab="shop">Магазин</button>
         </nav>
         <div class="cabinet-body">
             <section id="cab-profile" class="cabinet-section is-active">
                 <div class="cabinet-card">
-                    <h3>Опыт и прогресс</h3>
-                    <p class="cabinet-muted">XP копится в игре. Уровень считается по формуле agar.su — чем больше играешь, тем выше звезда на профиле.</p>
+                    <h3>Прогресс</h3>
+                    <p class="cabinet-muted">XP копится в игре. Уровень — как на agar.su.</p>
                     <div class="cabinet-stats" style="margin-top:12px">
                         <div class="cabinet-stat"><b id="cabinetStatXp">0</b><span>XP</span></div>
                         <div class="cabinet-stat"><b id="cabinetStatLvl">0</b><span>Уровень</span></div>
-                        <div class="cabinet-stat"><b id="cabinetStatRank">—</b><span>Место</span></div>
+                        <div class="cabinet-stat"><b id="cabinetStatUid">—</b><span>ID</span></div>
                     </div>
                 </div>
                 <div class="cabinet-card">
                     <h3>Быстрые действия</h3>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                    <div class="cabinet-actions">
                         <button type="button" class="cabinet-btn" onclick="AgarCabinet.open('skins')">Мои скины</button>
-                        <button type="button" class="cabinet-btn blue" onclick="AgarCabinet.open('leaderboard')">Топ игроков</button>
-                        <a class="cabinet-btn gold" href="https://lk.agar.su/" target="_blank" rel="noopener">Магазин Agar.su</a>
+                        <button type="button" class="cabinet-btn blue" onclick="AgarCabinet.open('rating')">Рейтинг</button>
+                        <button type="button" class="cabinet-btn gold" onclick="AgarCabinet.open('shop')">Магазин</button>
                     </div>
                 </div>
             </section>
-            <section id="cab-leaderboard" class="cabinet-section">
+            <section id="cab-rating" class="cabinet-section">
                 <div class="cabinet-card">
-                    <h3>Лидерборд сервера</h3>
-                    <p class="cabinet-muted" style="margin-bottom:10px">Топ-10 + твоё место, если ты ниже десятки (например 47.).</p>
-                    <ul class="cabinet-lb" id="cabinetLbList"></ul>
+                    <h3>Лучшие игроки</h3>
+                    <p class="cabinet-muted" style="margin-bottom:12px">Топ-100 аккаунтов по XP (stats).</p>
+                    <div class="cab-rating-head">
+                        <div>#</div>
+                        <div>Игрок</div>
+                        <div>LVL</div>
+                        <div>ID</div>
+                    </div>
+                    <ul class="cab-rating-list" id="cabinetRatingList">
+                        <li class="cabinet-skin-empty" style="display:block;grid-column:1/-1">Загрузка…</li>
+                    </ul>
                 </div>
             </section>
             <section id="cab-skins" class="cabinet-section">
                 <div class="cabinet-card">
                     <h3>Скины</h3>
-                    <p class="cabinet-muted" style="margin-bottom:10px">Превью скинов с api.agar.su. Свой скин можно заказать в магазине.</p>
+                    <p class="cabinet-muted" style="margin-bottom:12px">Только ники, под которыми ты уже играл и у которых есть скин.</p>
                     <div class="cabinet-skins-grid" id="cabinetSkinsGrid"></div>
-                    <div style="margin-top:12px">
-                        <a class="cabinet-btn" href="https://agar.su/account" target="_blank" rel="noopener">Заказать скин</a>
-                    </div>
                 </div>
             </section>
-            <section id="cab-donate" class="cabinet-section">
-                <div class="cabinet-donate-grid">
-                    <div class="cabinet-donate-item">
-                        <span class="cabinet-flask" aria-hidden="true"></span>
-                        <h4>Скин</h4>
-                        <p>Персональная картинка на шарик по нику. Для клана — отдельный тариф.</p>
-                        <div class="price">от 100 ₽</div>
-                        <a class="cabinet-btn" href="https://lk.agar.su/" target="_blank" rel="noopener">Купить</a>
-                    </div>
-                    <div class="cabinet-donate-item">
-                        <h4>Пароль / защита</h4>
-                        <p>Закрепи ник паролем, чтобы никто не зашёл под тобой.</p>
-                        <div class="price">100 ₽</div>
-                        <a class="cabinet-btn blue" href="https://lk.agar.su/" target="_blank" rel="noopener">Оформить</a>
-                    </div>
-                    <div class="cabinet-donate-item">
-                        <h4>GIF-скин</h4>
-                        <p>Анимированный скин. Клан — ×2.</p>
-                        <div class="price">от 4 500 ₽</div>
-                        <a class="cabinet-btn gold" href="https://lk.agar.su/" target="_blank" rel="noopener">Заказать</a>
-                    </div>
-                    <div class="cabinet-donate-item">
-                        <h4>Прочее</h4>
-                        <p>Невидимость, поворот и другие услуги — в полном магазине.</p>
-                        <div class="price">от 500 ₽</div>
-                        <a class="cabinet-btn" href="https://lk.agar.su/" target="_blank" rel="noopener">Открыть ЛК</a>
+            <section id="cab-shop" class="cabinet-section">
+                <div class="cabinet-card">
+                    <h3>Магазин лички</h3>
+                    <p class="cabinet-muted" style="margin-bottom:12px">Скин, пароль, невидимость и поворот — как в клиенте agar.su.</p>
+                    <div class="cab-shop">
+                        <div>
+                            <form id="cabPaymentForm" autocomplete="off">
+                                <div class="cab-shop-main">
+                                    <label class="cab-shop-preview" id="cabPreviewBox" title="PNG / JPG / GIF">
+                                        <canvas id="cabPreviewCanvas" width="256" height="256"></canvas>
+                                        <img id="cabPreviewGif" alt="">
+                                        <span class="hint">Загрузить<br>скин</span>
+                                        <input type="file" id="cabFileInput" accept=".png,.jpg,.jpeg,.gif,image/png,image/jpeg,image/gif">
+                                    </label>
+                                    <div class="cab-shop-fields">
+                                        <div class="cab-field">
+                                            <label for="cabNickname">Никнейм</label>
+                                            <input type="text" id="cabNickname" maxlength="16" placeholder="Ваш ник" required>
+                                        </div>
+                                        <div class="cab-field">
+                                            <label for="cabPassword">Пароль на ник</label>
+                                            <input type="password" id="cabPassword" maxlength="5" placeholder="Необязательно">
+                                        </div>
+                                        <div class="cab-shop-pills">
+                                            <label class="cab-pill"><input type="radio" name="cabServiceType" value="personal" checked> Себе</label>
+                                            <label class="cab-pill"><input type="radio" name="cabServiceType" value="clan"> Клан</label>
+                                            <label class="cab-pill"><input type="checkbox" id="cabInvisible"> Невид. ник</label>
+                                            <label class="cab-pill"><input type="checkbox" id="cabRotation"> Поворот</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                            <div class="cab-shop-msg" id="cabShopMsg"></div>
+                            <p class="cab-shop-support">Поддержка: <a href="https://t.me/nikkkkkysha" target="_blank" rel="noopener">@nikkkkkysha</a></p>
+                        </div>
+                        <aside class="cab-shop-receipt">
+                            <h4>Заказ</h4>
+                            <ul>
+                                <li><span>Множитель</span><strong id="cabMult">1×</strong></li>
+                                <li><span>Пароль</span><strong id="cabPassCost">0 ₽</strong></li>
+                                <li><span>Скин</span><strong id="cabSkinCost">0 ₽</strong></li>
+                                <li><span>Невидимость</span><strong id="cabInvCost">0 ₽</strong></li>
+                                <li><span>Поворот</span><strong id="cabRotCost">0 ₽</strong></li>
+                            </ul>
+                            <div class="cab-shop-total"><span>Итого</span><strong id="cabTotal">0 ₽</strong></div>
+                            <button type="submit" form="cabPaymentForm" class="cab-shop-buy" id="cabBuyBtn" disabled>Купить</button>
+                        </aside>
                     </div>
                 </div>
             </section>
         </div>
     </div>
 </div>
-<script src="./cabinet.js?2"></script>
+<script src="./cabinet.js?3"></script>
 </body>
 </html>
