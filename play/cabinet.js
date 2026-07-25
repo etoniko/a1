@@ -712,6 +712,8 @@
         input.readOnly = true;
         input.value = pass;
         input.placeholder = "—";
+        input.autocomplete = "new-password";
+        input.spellcheck = false;
         const eye = document.createElement("button");
         eye.type = "button";
         eye.textContent = "👁";

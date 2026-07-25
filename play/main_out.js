@@ -1611,7 +1611,7 @@ setSpect() {
         var from = len - 15;
         if (from < 0) from = 0;
 
-        const STAR_GAP = 22;
+        const STAR_GAP = 28;
         const chatEntries = [];
         for (let i = from; i < len; i++) {
             const entry = this.chatBoard[i];
@@ -1636,7 +1636,7 @@ setSpect() {
                 if (li === 0) {
                     let x = CHAT_BASE_X;
                     if (hasLvl) {
-                        this.drawLevelStar(ctx, x + 9, lineY + 10, entry.playerLevel, 9);
+                        this.drawLevelStar(ctx, x + 11, lineY + 10, entry.playerLevel, 12);
                         x += starPad;
                     }
                     const nameImg = chatName.render();
@@ -1695,16 +1695,15 @@ setSpect() {
         ctx.fill();
     }
     drawLevelStar(ctx, cx, cy, level, outerR) {
-        outerR = outerR || 12;
-        const innerR = outerR * 0.45;
+        outerR = outerR || 16;
+        const innerR = outerR * 0.42;
         ctx.fillStyle = this.lbStarColor(level);
         this.drawLbStar(ctx, cx, cy, outerR, innerR);
         const lvlStr = String(level);
-        // Keep digits inside the star — smaller for 2–3 digit levels
-        let fontPx = 8;
-        if (lvlStr.length >= 3) fontPx = 6;
-        else if (lvlStr.length === 2) fontPx = 7;
-        else if (outerR >= 12) fontPx = 9;
+        // Scale digits with star size so they stay readable and inside
+        let fontPx = Math.max(8, Math.round(outerR * 0.72));
+        if (lvlStr.length >= 3) fontPx = Math.max(7, Math.round(outerR * 0.55));
+        else if (lvlStr.length === 2) fontPx = Math.max(8, Math.round(outerR * 0.62));
         ctx.font = "bold " + fontPx + "px Ubuntu,sans-serif";
         ctx.fillStyle = this.lbLevelTextColor(level);
         ctx.textAlign = "center";
@@ -1808,10 +1807,10 @@ setSpect() {
             var level = this.lbEntryLevel(entry, isMe);
             var nameX = 8 + ctx.measureText(rankLabel).width + 4;
             if (level != null && level >= 0) {
-                var cx = nameX + 12;
+                var cx = nameX + 15;
                 var cy = y - 6;
-                this.drawLevelStar(ctx, cx, cy, level, 12);
-                nameX += 30;
+                this.drawLevelStar(ctx, cx, cy, level, 15);
+                nameX += 36;
             }
             ctx.font = canvasFont(18);
             ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";

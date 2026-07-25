@@ -14,7 +14,7 @@
     <link href="./index.css?10" rel="stylesheet">
     <link href="./cabinet.css?7" rel="stylesheet">
     <script src="./antimat.js?2"></script>
-    <script src="./main_out.js?22"></script>
+    <script src="./main_out.js?23"></script>
     <script src="https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js"></script>
     <link id="favicon" rel="icon" type="image/png" href="favicon.png">
     <!-- Yandex.RTB: ID блоков задаются в rtb-ads.js (AGAR_RSYA) -->
@@ -166,8 +166,8 @@
                                         <div class="circle tiny green"><span class="plus-text">+</span></div>
                                     </div>
                                     <div class="playnick-inputs">
-                                        <input id="nick" type="text" placeholder="Nick" maxlength="16">
-                                        <input id="pass" type="password" placeholder="Pass" maxlength="8">
+                                        <input id="nick" type="text" placeholder="Nick" maxlength="16" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="agar-nick">
+                                        <input id="pass" type="password" placeholder="Pass" maxlength="8" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" name="agar-pass">
                                     </div>
                                 </div>
                                 <button type="button" class="btn btn-play" id="play" onclick="setNick(document.getElementById('nick').value + '#' + document.getElementById('pass').value); return false;">Play</button>
@@ -286,7 +286,7 @@
 </div>
 
 <canvas id="canvas"></canvas>
-<input type="text" id="chat_textbox" placeholder="Press enter to chat" maxlength="120">
+<input type="text" id="chat_textbox" placeholder="Press enter to chat" maxlength="120" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="agar-chat">
 <script>
 function openSettings() {
     document.getElementById('mainui-settings').style.display = 'block';
@@ -423,44 +423,52 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!showPass) passInput.value = '';
     }
 
+    // No saved nick/pass — clear old cookies and never persist
+    setCookie('userNick', '', -1);
+    setCookie('userPass', '', -1);
+
     fetch('https://api.agar.su/pass.txt')
         .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
         .then(data => {
             allowedNicks = data.split('\n')
                 .map(n => normalizeNick(n))
                 .filter(n => n !== '');
-            const savedNick = getCookie('userNick');
-            const savedPass = getCookie('userPass');
-            if (savedNick) {
-                nickInput.value = savedNick;
-                checkNickStatus(savedNick);
-            }
-            if (savedPass && passInput.style.display !== 'none') {
-                passInput.value = savedPass;
-            }
+            checkNickStatus(nickInput.value.trim());
         })
         .catch(err => console.error('Ошибка загрузки pass.txt:', err));
 
     nickInput.addEventListener('input', () => {
         const currentNick = nickInput.value.trim();
-        if (currentNick) setCookie('userNick', currentNick, 7);
-        else {
-            setCookie('userNick', '', -1);
+        if (!currentNick) {
             passInput.style.display = 'none';
             passInput.value = '';
         }
         checkNickStatus(currentNick);
     });
 
-    passInput.addEventListener('input', () => {
-        const currentPass = passInput.value.trim();
-        if (currentPass) setCookie('userPass', currentPass, 7);
-        else setCookie('userPass', '', -1);
-    });
-
     nickInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             document.getElementById('play').click();
+        }
+    });
+
+    // Disable browser autofill / suggestions on all text-like inputs
+    function disableInputMemory(root) {
+        (root || document).querySelectorAll('input[type="text"], input[type="password"], input[type="search"], input:not([type]), textarea').forEach((inp) => {
+            inp.setAttribute('autocomplete', inp.type === 'password' ? 'new-password' : 'off');
+            inp.setAttribute('autocorrect', 'off');
+            inp.setAttribute('autocapitalize', 'off');
+            inp.setAttribute('spellcheck', 'false');
+            if (!inp.getAttribute('name') || /^(nick|pass|username|password)$/i.test(inp.getAttribute('name'))) {
+                inp.setAttribute('name', 'agar-' + (inp.id || inp.type || 'field') + '-' + Math.random().toString(36).slice(2, 7));
+            }
+        });
+    }
+    disableInputMemory(document);
+    document.addEventListener('focusin', (e) => {
+        const inp = e.target;
+        if (inp && inp.tagName === 'INPUT' && (inp.type === 'text' || inp.type === 'password' || inp.type === 'search' || !inp.type)) {
+            inp.setAttribute('autocomplete', inp.type === 'password' ? 'new-password' : 'off');
         }
     });
 });
@@ -560,11 +568,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <div class="cab-shop-fields">
                                         <div class="cab-field">
                                             <label for="cabNickname">Никнейм</label>
-                                            <input type="text" id="cabNickname" maxlength="16" placeholder="Ваш ник" required>
+                                            <input type="text" id="cabNickname" maxlength="16" placeholder="Ваш ник" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="cab-nick">
                                         </div>
                                         <div class="cab-field">
                                             <label for="cabPassword">Пароль на ник</label>
-                                            <input type="password" id="cabPassword" maxlength="5" placeholder="Необязательно">
+                                            <input type="password" id="cabPassword" maxlength="5" placeholder="Необязательно" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" name="cab-pass">
                                         </div>
                                         <div class="cab-shop-pills">
                                             <label class="cab-pill"><input type="radio" name="cabServiceType" value="personal" checked> Себе</label>
@@ -596,6 +604,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 </div>
-<script src="./cabinet.js?8"></script>
+<script src="./cabinet.js?9"></script>
 </body>
 </html>
