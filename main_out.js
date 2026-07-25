@@ -279,7 +279,7 @@ function initHelloDialogScale() {
 }
 
 const SERVERS = {
-    ffa: "127.0.0.1:6013", // LOCAL test — restore ffa.agar.su:6013 after
+    ffa: "ffa.agar.su:6013"
     ffa2: "ffa.agar.su",
     experimental: "ffa.agar.su", // alias → Special / ffa2
     ms: "ffa.agar.su:6002",
