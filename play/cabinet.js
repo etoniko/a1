@@ -126,11 +126,9 @@
         tab: "profile",
         skinMap: null,
         skinEntries: null,
-        freeSkins: null,
         passSet: null,
         invisibleSet: null,
         rotationSet: null,
-        skinsFilter: "",
         rating: null,
         nicknames: null,
         invTab: "nicks",
@@ -238,17 +236,6 @@
         state.skinMap = map;
         state.skinEntries = entries.reverse();
         return map;
-    }
-    async function ensureFreeSkins() {
-        await ensureSkinMap();
-        await ensurePerkLists();
-        if (state.freeSkins) return state.freeSkins;
-        const pass = state.passSet || new Set();
-        state.freeSkins = (state.skinEntries || []).filter((s) => {
-            const raw = String(s.nick || "");
-            return !pass.has(raw.toLowerCase()) && !pass.has(normalizeNick(raw));
-        });
-        return state.freeSkins;
     }
     async function resolveSkinCode(nickOrKey) {
         const map = await ensureSkinMap();
@@ -585,33 +572,29 @@
     async function renderSkins() {
         if (!el.skinsGrid) return;
         el.skinsGrid.innerHTML = '<div class="cabinet-skin-empty">Загрузка…</div>';
-        let skins;
-        try {
-            skins = await ensureFreeSkins();
-        } catch (e) {
-            el.skinsGrid.innerHTML = '<div class="cabinet-skin-empty">Не удалось загрузить скины.</div>';
+        await ensureSkinMap();
+        const played = loadPlayed();
+        const skins = [];
+        const seen = new Set();
+        for (const item of played) {
+            const key = normalizeNick(item.nick);
+            if (!key || seen.has(key)) continue;
+            const code = item.code || state.skinMap[key] || state.skinMap[String(item.nick || "").toLowerCase()];
+            if (!code) continue;
+            seen.add(key);
+            skins.push({ nick: item.nick, code: String(code) });
+        }
+        if (!skins.length) {
+            el.skinsGrid.innerHTML = '<div class="cabinet-skin-empty">Пока пусто.<br>Сыграй или выбери ник со скином — он сохранится здесь.<br>Купленные ники — во вкладке Профиль.</div>';
             return;
         }
-        const q = String(state.skinsFilter || "").trim().toLowerCase();
-        const filtered = q
-            ? skins.filter((s) => String(s.nick).toLowerCase().includes(q))
-            : skins;
-        if (!filtered.length) {
-            el.skinsGrid.innerHTML = '<div class="cabinet-skin-empty">' +
-                (q ? "Ничего не найдено." : "Список пуст.") + "</div>";
-            return;
-        }
-        const limit = 400;
-        const slice = filtered.slice(0, limit);
-        el.skinsGrid.innerHTML = slice.map((s) => {
+        el.skinsGrid.innerHTML = skins.map((s) => {
             const sel = state.selectedSkin && String(state.selectedSkin) === String(s.code) ? " is-selected" : "";
             return '<button type="button" class="cabinet-skin' + sel + '" data-nick="' +
                 escapeHtml(s.nick) + '" data-code="' + escapeHtml(s.code) +
                 '" style="background-image:url(\'' + skinUrl(s.code).replace(/'/g, "%27") + '\')" title="' +
                 escapeHtml(s.nick) + '"><span class="tag">' + escapeHtml(s.nick) + "</span></button>";
-        }).join("") + (filtered.length > limit
-            ? '<div class="cabinet-skin-empty">Показано ' + limit + ' из ' + filtered.length + '. Уточните поиск.</div>'
-            : "");
+        }).join("");
     }
 
     function openShopForNick(nickPart, isClan, opts) {
@@ -643,6 +626,7 @@
             passField.value = pass || "";
             passField.style.display = pass ? "block" : "";
         }
+        rememberPlayedNick(nickPart);
         updateHomeSkinPreview();
         closeCabinet();
     }
@@ -1182,17 +1166,6 @@
         $all(".cab-inv-tab", el.root).forEach((btn) => {
             btn.addEventListener("click", () => setInvTab(btn.dataset.inv));
         });
-        const skinsSearch = $("#cabinetSkinsSearch", el.root);
-        if (skinsSearch) {
-            let st = null;
-            skinsSearch.addEventListener("input", () => {
-                clearTimeout(st);
-                st = setTimeout(() => {
-                    state.skinsFilter = skinsSearch.value || "";
-                    renderSkins();
-                }, 180);
-            });
-        }
         if (el.skinsGrid) {
             el.skinsGrid.addEventListener("click", (e) => {
                 const btn = e.target.closest(".cabinet-skin");
@@ -1204,6 +1177,7 @@
                     nickField.value = btn.dataset.nick;
                     nickField.dispatchEvent(new Event("input", { bubbles: true }));
                 }
+                if (btn.dataset.nick) rememberPlayedNick(btn.dataset.nick);
                 updateHomeSkinPreview();
                 renderSkins();
                 closeCabinet();
@@ -1213,7 +1187,7 @@
         bindShop();
         bindOpeners();
         bindNickSkin();
-        ensureFreeSkins();
+        ensureSkinMap();
         window.onVkAuth = completeVkLogin;
         handleVkUrlCallback();
         loadAccountProfile();
