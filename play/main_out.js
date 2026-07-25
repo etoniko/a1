@@ -100,7 +100,8 @@ function wrapChatMessageLines(message, prefixWidth, maxWidth, fontSize) {
 function getGameServerApiBase(hostOrUrl) {
     if (!hostOrUrl) return "https://ffa.agar.su";
     if (/^https?:\/\//i.test(hostOrUrl)) return String(hostOrUrl).replace(/\/$/, "");
-    return "https://" + String(hostOrUrl).replace(/^wss?:\/\//i, "");
+    const proto = location.protocol === "https:" ? "https://" : "http://";
+    return proto + String(hostOrUrl).replace(/^wss?:\/\//i, "");
 }
 
 const _sha256K = new Uint32Array([
@@ -278,11 +279,12 @@ function initHelloDialogScale() {
 }
 
 const SERVERS = {
-    ffa: "ffa.agar.su",
-	experimental: "kotov.fun:20001",
+    ffa: "ffa.agar.su:6013",
+    ffa2: "ffa.agar.su",
+    experimental: "ffa.agar.su", // alias → Special / ffa2
     ms: "ffa.agar.su:6002",
     pvp1: "ffa.agar.su:6004",
-	tournament: "ffa.agar.su:6006",
+    tournament: "ffa.agar.su:6006",
 };
 
 function resolveServerUrl(arg) {
@@ -291,8 +293,10 @@ function resolveServerUrl(arg) {
 }
 
 function resolveServerKey(urlOrKey) {
+    if (urlOrKey === "experimental") return "ffa2";
     if (SERVERS[urlOrKey]) return urlOrKey;
-    return Object.keys(SERVERS).find(k => SERVERS[k] === urlOrKey) || "ffa";
+    const hit = Object.keys(SERVERS).find(k => k !== "experimental" && SERVERS[k] === urlOrKey);
+    return hit || "ffa";
 }
 
 function syncGamemodeUI(urlOrKey) {
@@ -571,11 +575,10 @@ setSpect() {
     }
     initServersFromHash(reconnect) {
         const rawHash = location.hash.slice(1).split("?")[0];
-        const hash = rawHash || "ffa";
-        let url = SERVERS[hash] || null;
-        if (!url) url = SERVERS.ffa;
+        const hash = resolveServerKey(rawHash || "ffa");
+        let url = SERVERS[hash] || SERVERS[rawHash] || SERVERS.ffa;
         syncGamemodeUI(hash);
-        if (!rawHash || !SERVERS[rawHash]) {
+        if (!rawHash || rawHash !== hash || !SERVERS[rawHash]) {
             this.updateServerHash(url);
         }
         if (url === this.CONNECTION_URL) return;
