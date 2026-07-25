@@ -1686,6 +1686,9 @@ setSpect() {
             var x = (w > 190) ? 5 : 100 - w / 2;
             ctx.fillText(text, x, 70 + 24 * i);
         }
+        if (window.AgarCabinet && document.getElementById("cabinet")?.classList.contains("is-open")) {
+            window.AgarCabinet.refresh();
+        }
     }
     normalizeFractlPart(n) {
         return (n % (Math.PI * 2)) / (Math.PI * 2);
@@ -1830,8 +1833,10 @@ setSpect() {
     }
 }
     onUpdateXp(xp) {
-        // Placeholder for handling XP update
-        console.log("XP updated to:", xp);
+        this.accountXp = xp | 0;
+        if (window.AgarCabinet && typeof window.AgarCabinet.setXp === "function") {
+            window.AgarCabinet.setXp(this.accountXp);
+        }
     }
 }
 class BinaryReader {
@@ -2324,6 +2329,7 @@ class Cell {
 }
 
 const game = new Game();
+window.game = game;
 onload = () => {
     ensureCanvasFont().finally(() => {
         invalidateCanvasTextCaches();

@@ -12,8 +12,9 @@
 	<link rel="canonical" href="https://агарио.рф/play/">
     <link rel="preload" href="https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf" as="font" type="font/ttf" crossorigin>
     <link href="./index.css?8" rel="stylesheet">
+    <link href="./cabinet.css?1" rel="stylesheet">
     <script src="./antimat.js?2"></script>
-    <script src="./main_out.js?14"></script>
+    <script src="./main_out.js?15"></script>
     <link id="favicon" rel="icon" type="image/png" href="favicon.png">
     <!-- Yandex.RTB: ID блоков задаются в rtb-ads.js (AGAR_RSYA) -->
     <script>window.yaContextCb = window.yaContextCb || [];</script>
@@ -99,20 +100,20 @@
                 <div id="mainui-features">
                     <div class="features-container">
                         <div class="buttons-container">
-                            <div class="feature-button shop">
-                                <span class="label">Shop</span>
+                            <div class="feature-button shop" title="Магазин / Донат">
+                                <span class="label">Донат</span>
                                 <span class="sprite-main Icon-Store"></span>
                             </div>
-                            <div class="feature-button leaderboards">
-                                <span class="label">Leaderboards</span>
+                            <div class="feature-button leaderboards" title="Лидерборд">
+                                <span class="label">Топ</span>
                                 <span class="sprite-main Icon-Leaderboards"></span>
                             </div>
-                            <div class="feature-button quests">
-                                <span class="label">Daily Quests</span>
+                            <div class="feature-button quests" title="Профиль и XP">
+                                <span class="label">ЛК</span>
                                 <span class="sprite-main Icon-DailyQuests"></span>
                             </div>
-                            <div class="feature-button gifting">
-                                <span class="label">Gifts</span>
+                            <div class="feature-button gifting" title="Скины" onclick="AgarCabinet&&AgarCabinet.open('skins')">
+                                <span class="label">Скины</span>
                                 <span class="sprite-main Icon-Gifting"></span>
                             </div>
                         </div>
@@ -158,13 +159,11 @@
                             <div id="title" class="guest">Agar.su</div>
                             <div id="playnick">
                                 <div class="playnick-row">
-<a href="https://agar.su/account" target="_blank" style="text-decoration: none; display: inline-block;">
-    <div class="circle" id="skinButton">
-        <div id="skinLabel">Skins</div>
-        <div class="circle bordered skinWrapper"></div>
-        <div class="circle tiny green"><span class="plus-text">+</span></div>
-    </div>
-</a>
+                                    <div class="circle" id="skinButton" title="Скины" role="button" tabindex="0">
+                                        <div id="skinLabel">Skins</div>
+                                        <div class="circle bordered skinWrapper"></div>
+                                        <div class="circle tiny green"><span class="plus-text">+</span></div>
+                                    </div>
                                     <div class="playnick-inputs">
                                         <input id="nick" type="text" placeholder="Nick" maxlength="16">
                                         <input id="pass" type="password" placeholder="Pass" maxlength="8">
@@ -465,5 +464,98 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 </script>
+
+<div id="cabinet" class="cabinet" aria-hidden="true">
+    <div class="cabinet-panel" role="dialog" aria-label="Личный кабинет">
+        <button type="button" class="cabinet-close" aria-label="Закрыть">&times;</button>
+        <div class="cabinet-head">
+            <div class="cabinet-avatar" id="cabinetAvatar"></div>
+            <div class="cabinet-head-meta">
+                <div class="cabinet-nick" id="cabinetNick">Гость</div>
+                <div class="cabinet-level-row">
+                    <span class="cabinet-star" aria-hidden="true"></span>
+                    <div class="cabinet-xp-wrap">
+                        <div class="cabinet-xp-bar"><div class="cabinet-xp-fill" id="cabinetXpFill"></div></div>
+                        <div class="cabinet-xp-text" id="cabinetXpText">Ур. 0 · 0 / 50 XP</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <nav class="cabinet-tabs">
+            <button type="button" class="cabinet-tab is-active" data-tab="profile">Профиль</button>
+            <button type="button" class="cabinet-tab" data-tab="leaderboard">Лидерборд</button>
+            <button type="button" class="cabinet-tab" data-tab="skins">Скины</button>
+            <button type="button" class="cabinet-tab" data-tab="donate">Донат</button>
+        </nav>
+        <div class="cabinet-body">
+            <section id="cab-profile" class="cabinet-section is-active">
+                <div class="cabinet-card">
+                    <h3>Опыт и прогресс</h3>
+                    <p class="cabinet-muted">XP копится в игре. Уровень считается по формуле agar.su — чем больше играешь, тем выше звезда на профиле.</p>
+                    <div class="cabinet-stats" style="margin-top:12px">
+                        <div class="cabinet-stat"><b id="cabinetStatXp">0</b><span>XP</span></div>
+                        <div class="cabinet-stat"><b id="cabinetStatLvl">0</b><span>Уровень</span></div>
+                        <div class="cabinet-stat"><b id="cabinetStatRank">—</b><span>Место</span></div>
+                    </div>
+                </div>
+                <div class="cabinet-card">
+                    <h3>Быстрые действия</h3>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                        <button type="button" class="cabinet-btn" onclick="AgarCabinet.open('skins')">Мои скины</button>
+                        <button type="button" class="cabinet-btn blue" onclick="AgarCabinet.open('leaderboard')">Топ игроков</button>
+                        <a class="cabinet-btn gold" href="https://lk.agar.su/" target="_blank" rel="noopener">Магазин Agar.su</a>
+                    </div>
+                </div>
+            </section>
+            <section id="cab-leaderboard" class="cabinet-section">
+                <div class="cabinet-card">
+                    <h3>Лидерборд сервера</h3>
+                    <p class="cabinet-muted" style="margin-bottom:10px">Топ-10 + твоё место, если ты ниже десятки (например 47.).</p>
+                    <ul class="cabinet-lb" id="cabinetLbList"></ul>
+                </div>
+            </section>
+            <section id="cab-skins" class="cabinet-section">
+                <div class="cabinet-card">
+                    <h3>Скины</h3>
+                    <p class="cabinet-muted" style="margin-bottom:10px">Превью скинов с api.agar.su. Свой скин можно заказать в магазине.</p>
+                    <div class="cabinet-skins-grid" id="cabinetSkinsGrid"></div>
+                    <div style="margin-top:12px">
+                        <a class="cabinet-btn" href="https://agar.su/account" target="_blank" rel="noopener">Заказать скин</a>
+                    </div>
+                </div>
+            </section>
+            <section id="cab-donate" class="cabinet-section">
+                <div class="cabinet-donate-grid">
+                    <div class="cabinet-donate-item">
+                        <span class="cabinet-flask" aria-hidden="true"></span>
+                        <h4>Скин</h4>
+                        <p>Персональная картинка на шарик по нику. Для клана — отдельный тариф.</p>
+                        <div class="price">от 100 ₽</div>
+                        <a class="cabinet-btn" href="https://lk.agar.su/" target="_blank" rel="noopener">Купить</a>
+                    </div>
+                    <div class="cabinet-donate-item">
+                        <h4>Пароль / защита</h4>
+                        <p>Закрепи ник паролем, чтобы никто не зашёл под тобой.</p>
+                        <div class="price">100 ₽</div>
+                        <a class="cabinet-btn blue" href="https://lk.agar.su/" target="_blank" rel="noopener">Оформить</a>
+                    </div>
+                    <div class="cabinet-donate-item">
+                        <h4>GIF-скин</h4>
+                        <p>Анимированный скин. Клан — ×2.</p>
+                        <div class="price">от 4 500 ₽</div>
+                        <a class="cabinet-btn gold" href="https://lk.agar.su/" target="_blank" rel="noopener">Заказать</a>
+                    </div>
+                    <div class="cabinet-donate-item">
+                        <h4>Прочее</h4>
+                        <p>Невидимость, поворот и другие услуги — в полном магазине.</p>
+                        <div class="price">от 500 ₽</div>
+                        <a class="cabinet-btn" href="https://lk.agar.su/" target="_blank" rel="noopener">Открыть ЛК</a>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+<script src="./cabinet.js?1"></script>
 </body>
 </html>
