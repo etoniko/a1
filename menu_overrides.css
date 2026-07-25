@@ -333,6 +333,23 @@
     padding: 0;
 }
 
+#helloDialog #playnick .btn-play.play-locked,
+#helloDialog #playnick .btn-play:disabled {
+    color: #fff !important;
+    background-color: #9a9a9a !important;
+    border-color: #8a8a8a !important;
+    cursor: not-allowed;
+    pointer-events: none;
+    opacity: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+#helloDialog #playnick .btn-play.play-locked:hover,
+#helloDialog #playnick .btn-play:disabled:hover {
+    background-color: #9a9a9a !important;
+    border-color: #8a8a8a !important;
+}
+
 #helloDialog #instructions {
     position: relative;
     top: 0;

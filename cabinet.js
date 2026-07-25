@@ -169,7 +169,7 @@
     }
 
     async function fetchTxtLines(url) {
-        const res = await fetch(url, { cache: "no-store" });
+        const res = await fetch(url, { cache: "force-cache" });
         const text = await res.text();
         return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     }
@@ -181,25 +181,34 @@
                 rotation: state.rotationSet
             };
         }
+        if (state._perkPromise) return state._perkPromise;
+        state._perkPromise = (async () => {
+            try {
+                const [passLines, invLines, rotLines] = await Promise.all([
+                    fetchTxtLines(PASS_URL),
+                    fetchTxtLines(INVISIBLE_URL),
+                    fetchTxtLines(ROTATION_URL)
+                ]);
+                await new Promise((r) => setTimeout(r, 0));
+                state.passSet = new Set(passLines.map((n) => n.toLowerCase()));
+                state.invisibleSet = new Set(invLines.map((n) => n.toLowerCase()));
+                state.rotationSet = new Set(rotLines.map((n) => n.toLowerCase()));
+            } catch (e) {
+                state.passSet = state.passSet || new Set();
+                state.invisibleSet = state.invisibleSet || new Set();
+                state.rotationSet = state.rotationSet || new Set();
+            }
+            return {
+                pass: state.passSet,
+                invisible: state.invisibleSet,
+                rotation: state.rotationSet
+            };
+        })();
         try {
-            const [passLines, invLines, rotLines] = await Promise.all([
-                fetchTxtLines(PASS_URL),
-                fetchTxtLines(INVISIBLE_URL),
-                fetchTxtLines(ROTATION_URL)
-            ]);
-            state.passSet = new Set(passLines.map((n) => n.toLowerCase()));
-            state.invisibleSet = new Set(invLines.map((n) => n.toLowerCase()));
-            state.rotationSet = new Set(rotLines.map((n) => n.toLowerCase()));
-        } catch (e) {
-            state.passSet = state.passSet || new Set();
-            state.invisibleSet = state.invisibleSet || new Set();
-            state.rotationSet = state.rotationSet || new Set();
+            return await state._perkPromise;
+        } finally {
+            state._perkPromise = null;
         }
-        return {
-            pass: state.passSet,
-            invisible: state.invisibleSet,
-            rotation: state.rotationSet
-        };
     }
     function nickInSet(set, nickname) {
         const lower = String(nickname || "").toLowerCase();
@@ -209,33 +218,51 @@
     }
 
     async function ensureSkinMap() {
-        if (state.skinMap && state.skinEntries) return state.skinMap;
-        const map = Object.create(null);
-        const entries = [];
+        if (state.skinMap) return state.skinMap;
+        if (state._skinMapPromise) return state._skinMapPromise;
+        state._skinMapPromise = (async () => {
+            const map = Object.create(null);
+            const g = window.game;
+            // Prefer already-loaded game map — avoid reparsing huge skinlist on profile open
+            if (g && g.skinMap && Object.keys(g.skinMap).length) {
+                Object.keys(g.skinMap).forEach((k) => { map[k] = g.skinMap[k]; });
+                state.skinMap = map;
+                state.skinEntries = state.skinEntries || [];
+                return map;
+            }
+            try {
+                const res = await fetch(SKINLIST_URL, { cache: "force-cache" });
+                const text = await res.text();
+                // Yield so game rAF can breathe before heavy parse
+                await new Promise((r) => setTimeout(r, 0));
+                const lines = text.split(/\r?\n/);
+                const entries = [];
+                const CHUNK = 800;
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const idx = line.indexOf(":");
+                    if (idx < 0) continue;
+                    const nick = line.slice(0, idx).trim();
+                    const code = line.slice(idx + 1).trim();
+                    if (!nick || !code) continue;
+                    const key = normalizeNick(nick);
+                    if (key) map[key] = code;
+                    map[nick.toLowerCase()] = code;
+                    entries.push({ nick, code: String(code) });
+                    if (i > 0 && i % CHUNK === 0) {
+                        await new Promise((r) => setTimeout(r, 0));
+                    }
+                }
+                state.skinEntries = entries;
+            } catch (e) { /* empty */ }
+            state.skinMap = map;
+            return map;
+        })();
         try {
-            const res = await fetch(SKINLIST_URL, { cache: "no-store" });
-            const text = await res.text();
-            text.split(/\r?\n/).forEach((line) => {
-                const idx = line.indexOf(":");
-                if (idx < 0) return;
-                const nick = line.slice(0, idx).trim();
-                const code = line.slice(idx + 1).trim();
-                if (!nick || !code) return;
-                const key = normalizeNick(nick);
-                if (key) map[key] = code;
-                map[nick.toLowerCase()] = code;
-                entries.push({ nick, code: String(code) });
-            });
-        } catch (e) { /* empty */ }
-        const g = window.game;
-        if (g && g.skinMap) {
-            Object.keys(g.skinMap).forEach((k) => {
-                if (!map[k]) map[k] = g.skinMap[k];
-            });
+            return await state._skinMapPromise;
+        } finally {
+            state._skinMapPromise = null;
         }
-        state.skinMap = map;
-        state.skinEntries = entries.reverse();
-        return map;
     }
     async function resolveSkinCode(nickOrKey) {
         const map = await ensureSkinMap();
@@ -287,12 +314,7 @@
     function updateXpUi(xp) {
         state.xp = Math.max(0, xp | 0);
         const p = xpProgress(state.xp);
-        if (window.game) {
-            window.game.accountXp = state.xp;
-            if (window.game.leaderBoard && window.game.leaderBoard.length && typeof window.game.drawLeaderBoard === "function") {
-                window.game.drawLeaderBoard();
-            }
-        }
+        if (window.game) window.game.accountXp = state.xp;
 
         const menuFill = $("#progressBar .progress-bar");
         const menuText = $("#progressBar .progress-bar-text");
@@ -315,7 +337,12 @@
             el.avatar.style.backgroundImage = "url('" + state.accountAvatar.replace(/'/g, "%27") + "')";
         }
         updateAuthUi();
-        updateHomeSkinPreview();
+        // Skin preview is expensive (skinlist); only when nick/avatar identity may have changed
+        const previewKey = displayName + "|" + (state.accountAvatar || "");
+        if (state._previewKey !== previewKey) {
+            state._previewKey = previewKey;
+            updateHomeSkinPreview();
+        }
     }
 
     function updateAuthUi() {
@@ -756,6 +783,7 @@
             if (panels) panels.hidden = true;
             nickList.innerHTML = "";
             clanList.innerHTML = "";
+            state._invRendered = false;
             return;
         }
 
@@ -799,6 +827,7 @@
         if (badgeNick) badgeNick.textContent = String(nickCount);
         if (badgeClan) badgeClan.textContent = String(clanCount);
         setInvTab(state.invTab || "nicks");
+        state._invRendered = true;
     }
 
     async function loadMyNicknames(force) {
@@ -808,12 +837,14 @@
             return;
         }
         if (!force && Array.isArray(state.nicknames)) {
-            renderInventory();
+            if (!state._invRendered) renderInventory();
             return;
         }
+        if (state._nickLoading) return;
+        state._nickLoading = true;
         renderInventory();
         try {
-            await Promise.all([ensureSkinMap(), ensurePerkLists()]);
+            // Fetch nicknames first (small); perk/skin lists can wait
             const res = await fetch("https://api.agar.su/api/me/nicknames", {
                 headers: { Authorization: "Game " + getAccountToken() },
                 cache: "no-store"
@@ -828,7 +859,14 @@
             if (!res.ok) throw new Error("nicknames " + res.status);
             const data = await res.json();
             state.nicknames = Array.isArray(data?.nicknames) ? data.nicknames : [];
+            // Load perk/skin maps in background, then re-render badges once
             renderInventory();
+            Promise.all([ensureSkinMap(), ensurePerkLists()]).then(() => {
+                if (el.root?.classList.contains("is-open") && state.tab === "profile") {
+                    state._invRendered = false;
+                    renderInventory();
+                }
+            }).catch(() => {});
         } catch (e) {
             const nickList = document.getElementById("myNickList");
             if (nickList) nickList.innerHTML = '<li class="error">Не удалось загрузить никнеймы</li>';
@@ -838,6 +876,8 @@
             if (hint) hint.hidden = true;
             if (tabs) tabs.hidden = false;
             if (panels) panels.hidden = false;
+        } finally {
+            state._nickLoading = false;
         }
     }
 
@@ -1036,8 +1076,7 @@
         el.root.setAttribute("aria-hidden", "false");
         if (tab) setTab(tab);
         else if (!state.tab) setTab("profile");
-        refreshAll();
-        // VK widget only after panel is visible (display:none breaks OneTap)
+        else updateXpUi(state.xp);
         requestAnimationFrame(() => ensureVkWidget(false));
     }
     function closeCabinet() {
@@ -1046,6 +1085,7 @@
         el.root.setAttribute("aria-hidden", "true");
     }
     function setTab(tab) {
+        const prev = state.tab;
         state.tab = tab;
         $all(".cabinet-tab", el.root).forEach((btn) => {
             btn.classList.toggle("is-active", btn.dataset.tab === tab);
@@ -1058,15 +1098,14 @@
         if (tab === "shop") calculateShop();
         if (tab === "profile") {
             requestAnimationFrame(() => ensureVkWidget(false));
-            loadMyNicknames(false);
+            // Defer inventory work so open animation / game loop stay smooth
+            setTimeout(() => loadMyNicknames(false), 0);
         }
     }
 
     function refreshAll() {
         updateXpUi(state.xp);
-        if (state.tab === "rating") renderRating();
-        if (state.tab === "skins") renderSkins();
-        if (state.tab === "profile") loadMyNicknames(false);
+        // Never rebuild heavy tabs from game tick — only light XP/auth
     }
 
     function bindOpeners() {
@@ -1189,11 +1228,20 @@
         bindShop();
         bindOpeners();
         bindNickSkin();
-        ensureSkinMap();
+        // Warm skin map idle — don't block first paint / game start
+        const warmSkins = () => { ensureSkinMap().catch(() => {}); };
+        if (typeof requestIdleCallback === "function") requestIdleCallback(warmSkins, { timeout: 4000 });
+        else setTimeout(warmSkins, 1500);
         window.onVkAuth = completeVkLogin;
         handleVkUrlCallback();
         loadAccountProfile();
-        setTab("profile");
+        state.tab = "profile";
+        $all(".cabinet-tab", el.root).forEach((btn) => {
+            btn.classList.toggle("is-active", btn.dataset.tab === "profile");
+        });
+        $all(".cabinet-section", el.root).forEach((sec) => {
+            sec.classList.toggle("is-active", sec.id === "cab-profile");
+        });
         renderInventory();
 
         window.AgarCabinet = {

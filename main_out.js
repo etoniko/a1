@@ -279,7 +279,7 @@ function initHelloDialogScale() {
 }
 
 const SERVERS = {
-    ffa: "ffa.agar.su:6013",
+    ffa: "127.0.0.1:6013", // LOCAL test — restore ffa.agar.su:6013 after
     ffa2: "ffa.agar.su",
     experimental: "ffa.agar.su", // alias → Special / ffa2
     ms: "ffa.agar.su:6002",
@@ -573,7 +573,8 @@ setSpect() {
 }
     updateServerHash(url) {
         const hash = resolveServerKey(url);
-        history.replaceState(null, "", "#" + hash);
+        const q = location.search || "";
+        history.replaceState(null, "", "/" + q + "#" + hash);
     }
     syncGamemodeSelect(url) {
         syncGamemodeUI(url);
@@ -1899,9 +1900,6 @@ setSpect() {
                 name = name.slice(0, -1);
             }
             ctx.fillText(name, nameX, y);
-        }
-        if (window.AgarCabinet && document.getElementById("cabinet")?.classList.contains("is-open")) {
-            window.AgarCabinet.refresh();
         }
     }
     normalizeFractlPart(n) {
