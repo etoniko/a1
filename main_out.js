@@ -100,6 +100,10 @@ function wrapChatMessageLines(message, prefixWidth, maxWidth, fontSize) {
 function getGameServerApiBase(hostOrUrl) {
     if (!hostOrUrl) return "https://ffa.agar.su";
     if (/^https?:\/\//i.test(hostOrUrl)) return String(hostOrUrl).replace(/\/$/, "");
+    
+    // Дополнительная проверка для hostkey.agar.su
+    if (hostOrUrl === "hostkey.agar.su") return "https://hostkey.agar.su";
+    
     const proto = location.protocol === "https:" ? "https://" : "http://";
     return proto + String(hostOrUrl).replace(/^wss?:\/\//i, "");
 }
@@ -280,7 +284,7 @@ function initHelloDialogScale() {
 
 const SERVERS = {
     ffa: "ffa.agar.su:6013",
-    ffa2: "ffa.agar.su",
+    ffa2: "hostkey.agar.su",
     experimental: "ffa.agar.su", // alias → Special / ffa2
     ms: "ffa.agar.su:6002",
     pvp1: "ffa.agar.su:6004",
