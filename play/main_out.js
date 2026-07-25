@@ -1654,21 +1654,21 @@ setSpect() {
                 xp: myEntry?.xp ?? 0
             });
         }
-        boardLength += 24 * visible.length;
+        boardLength += 26 * visible.length;
         var scale = Math.min(0.22 * this.canvasHeight, Math.min(200, 0.3 * this.canvasWidth)) * 0.005;
-        this.lbCanvas.width = 200 * scale;
+        this.lbCanvas.width = 220 * scale;
         this.lbCanvas.height = boardLength * scale;
         ctx.scale(scale, scale);
         ctx.globalAlpha = 0.4;
         ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, 200, boardLength);
+        ctx.fillRect(0, 0, 220, boardLength);
         ctx.globalAlpha = 1;
         ctx.fillStyle = "#FFFFFF";
         ctx.font = canvasFont(30);
         ctx.textAlign = "center";
-        ctx.fillText("Leaderboard", 100, 40);
+        ctx.fillText("Leaderboard", 110, 40);
         ctx.textAlign = "left";
-        ctx.font = canvasFont(20);
+        ctx.font = canvasFont(18);
         for (var i = 0; i < visible.length; i++) {
             var entry = visible[i];
             var name = entry.name || "An unnamed cell";
@@ -1677,14 +1677,36 @@ setSpect() {
             if (isMe && this.playerCells[0]?.name) {
                 name = this.playerCells[0].name;
             }
+            var y = 70 + 26 * i;
+            var rankLabel = (!this.noRanking ? ((isMe && myRank > 10 && i === visible.length - 1) ? myRank : (i + 1)) + ". " : "");
             ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
-            var text = (!this.noRanking ? (i + 1) + ". " : "") + name;
-            if (isMe && myRank > 10 && i === visible.length - 1) {
-                text = myRank + ". " + name;
+            ctx.fillText(rankLabel, 8, y);
+
+            var level = entry.level;
+            var starX = 8 + ctx.measureText(rankLabel).width + 2;
+            if (level != null && level >= 0) {
+                var starColor = "#FFD700";
+                if (level >= 200) starColor = "#222";
+                else if (level >= 150) starColor = "#fff";
+                else if (level >= 100) starColor = "#ff3030";
+                else if (level >= 50) starColor = "#00ffe5";
+                ctx.font = canvasFont(16);
+                ctx.fillStyle = starColor;
+                ctx.fillText("★", starX, y);
+                ctx.font = "bold 9px Ubuntu,sans-serif";
+                ctx.fillStyle = (level >= 100 && level < 150) ? "#FFD700" : (level >= 200 ? "#fff" : "#444");
+                ctx.textAlign = "center";
+                ctx.fillText(String(level), starX + 8, y - 1);
+                ctx.textAlign = "left";
+                starX += 22;
             }
-            var w = ctx.measureText(text).width;
-            var x = (w > 190) ? 5 : 100 - w / 2;
-            ctx.fillText(text, x, 70 + 24 * i);
+            ctx.font = canvasFont(18);
+            ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
+            var maxW = 210 - starX;
+            while (name.length > 1 && ctx.measureText(name).width > maxW) {
+                name = name.slice(0, -1);
+            }
+            ctx.fillText(name, starX, y);
         }
         if (window.AgarCabinet && document.getElementById("cabinet")?.classList.contains("is-open")) {
             window.AgarCabinet.refresh();

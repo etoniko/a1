@@ -200,13 +200,38 @@
     color: #5a6a7a;
 }
 .cabinet-lb .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cabinet-lb .lvl {
-    font-size: 12px;
-    color: #2d6cdf;
-    background: #e8f0ff;
-    border-radius: 999px;
-    padding: 2px 8px;
+.cab-star {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    line-height: 1;
 }
+.cab-star-icon {
+    font-size: 18px;
+    color: gold;
+    text-shadow: #fc0 0 0 6px;
+}
+.cab-star.azure .cab-star-icon { color: #00ffe5; text-shadow: #00ffe5 0 0 6px; }
+.cab-star.red .cab-star-icon { color: #ff3030; text-shadow: #ff3030 0 0 6px; }
+.cab-star.white .cab-star-icon { color: #fff; text-shadow: #fff 0 0 6px; }
+.cab-star.black .cab-star-icon { color: #222; text-shadow: #000 0 0 4px; }
+.cab-star-lvl {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 8px;
+    font-weight: 700;
+    color: #585858;
+    pointer-events: none;
+}
+.cab-star.red .cab-star-lvl { color: gold; }
+.cab-star.black .cab-star-lvl { color: #fff; }
+.cabinet-lb li.is-me .cab-star.white .cab-star-icon { color: #f5f5f5; }
 .cabinet-podium {
     width: 28px;
     height: 22px;

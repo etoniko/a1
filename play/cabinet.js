@@ -36,8 +36,54 @@
         xp: 0,
         tab: "profile",
         skins: [],
+        passNicks: null,
         selectedSkin: localStorage.getItem("cabinetSkin") || ""
     };
+
+    function normalizeNick(nick) {
+        if (!nick) return "";
+        let n = String(nick).trim();
+        const brackets = { "[": "]", "{": "}", "(": ")", "|": "|" };
+        const first = n.charAt(0);
+        if (brackets[first]) {
+            const close = brackets[first];
+            const end = n.indexOf(close, 1);
+            if (end === -1) return "";
+            n = n.substring(1, end);
+        }
+        return n.trim().toLowerCase();
+    }
+
+    function starClass(level) {
+        if (level >= 200) return "black";
+        if (level >= 150) return "white";
+        if (level >= 100) return "red";
+        if (level >= 50) return "azure";
+        return "";
+    }
+
+    function starHtml(level) {
+        if (level == null || level < 0) return "";
+        const cls = starClass(level);
+        return '<span class="cab-star' + (cls ? " " + cls : "") + '" title="Уровень ' + level + '">' +
+            '<span class="cab-star-icon">★</span>' +
+            (level < 200 ? '<span class="cab-star-lvl">' + level + '</span>' : "") +
+            "</span>";
+    }
+
+    async function ensurePassNicks() {
+        if (state.passNicks) return state.passNicks;
+        try {
+            const res = await fetch("https://api.agar.su/pass.txt", { cache: "no-store" });
+            const text = await res.text();
+            state.passNicks = new Set(
+                text.split(/\r?\n/).map(normalizeNick).filter(Boolean)
+            );
+        } catch (e) {
+            state.passNicks = new Set();
+        }
+        return state.passNicks;
+    }
 
     function $(sel, root) {
         return (root || document).querySelector(sel);
@@ -121,21 +167,25 @@
         let html = top.map((row, i) => {
             const rank = i + 1;
             const isMe = myIds.includes(row.id);
-            const lvl = row.level > 0 ? row.level : (row.xp ? levelFromXp(row.xp - 1) : 0);
+            const lvl = (row.level != null && row.level >= 0)
+                ? row.level
+                : (row.xp ? levelFromXp(row.xp) : -1);
             const podium = rank <= 3 ? '<span class="cabinet-podium" title="Топ"></span>' : "";
             return '<li class="' + (isMe ? "is-me" : "") + '">' +
                 podium +
                 '<span class="rank">' + rank + '</span>' +
-                '<span class="name">' + escapeHtml(row.name || "An unnamed cell") + '</span>' +
-                '<span class="lvl">Lv ' + lvl + '</span></li>';
+                starHtml(lvl) +
+                '<span class="name">' + escapeHtml(row.name || "An unnamed cell") + '</span></li>';
         }).join("");
 
         if (myRank && myRank > 10) {
             const me = rows[myRank - 1];
-            const lvl = me && me.level > 0 ? me.level : (me && me.xp ? levelFromXp(me.xp - 1) : 0);
+            const lvl = (me && me.level != null && me.level >= 0)
+                ? me.level
+                : (me && me.xp ? levelFromXp(me.xp) : -1);
             html += '<li class="is-me"><span class="rank">' + myRank + '</span>' +
-                '<span class="name">' + escapeHtml(currentNick()) + '</span>' +
-                '<span class="lvl">Lv ' + lvl + '</span></li>';
+                starHtml(lvl) +
+                '<span class="name">' + escapeHtml(currentNick()) + '</span></li>';
         }
         el.lbList.innerHTML = html;
     }
@@ -148,26 +198,26 @@
 
     async function ensureSkins() {
         if (state.skins.length) return state.skins;
-        const g = window.game;
-        if (g && g.skinMap && Object.keys(g.skinMap).length) {
-            state.skins = Object.keys(g.skinMap).slice(0, 80).map((nick) => ({
-                nick,
-                code: g.skinMap[nick]
-            }));
-            return state.skins;
-        }
+        const pass = await ensurePassNicks();
+        let raw = [];
         try {
             const res = await fetch("https://api.agar.su/skinlist.txt", { cache: "no-store" });
             const text = await res.text();
-            const out = [];
             text.split(/\r?\n/).forEach((line) => {
-                const [nick, code] = line.split(":");
-                if (nick && code) out.push({ nick: nick.trim(), code: code.trim() });
+                const idx = line.indexOf(":");
+                if (idx < 0) return;
+                const nick = line.slice(0, idx).trim();
+                const code = line.slice(idx + 1).trim();
+                if (nick && code) raw.push({ nick, code });
             });
-            state.skins = out.slice(0, 80);
         } catch (e) {
-            state.skins = [];
+            const g = window.game;
+            if (g && g.skinMap) {
+                raw = Object.keys(g.skinMap).map((nick) => ({ nick, code: g.skinMap[nick] }));
+            }
         }
+        // Free skins only: nick NOT listed in pass.txt (pass = paid/protected)
+        state.skins = raw.filter((s) => !pass.has(normalizeNick(s.nick)));
         return state.skins;
     }
 
