@@ -1,7 +1,8 @@
 /**
- * Блокировка кнопки Play на 1.5 с:
- * - после смерти (серая кнопка + цифры)
- * - после клика Play — меню закрывается и респавн только через 1.5 с
+ * Авто-вход в игру через 1.5 с:
+ * - при загрузке меню
+ * - после смерти
+ * Клик Play без ожидания — сразу спавн (если кнопка не в локе).
  */
 (function () {
     "use strict";
@@ -10,7 +11,7 @@
     var DEFAULT_LABEL = "Play";
     var timerId = null;
     var lockedUntil = 0;
-    var pendingPlay = false;
+    var autoStarted = false;
 
     function playBtn() {
         return document.getElementById("play");
@@ -37,24 +38,8 @@
         }
     }
 
-    function runCountdown(ms, onDone) {
-        clearTimer();
-        lockedUntil = Date.now() + ms;
-        setVisual(true, formatLeft(ms));
-
-        timerId = setInterval(function () {
-            var left = lockedUntil - Date.now();
-            if (left <= 0) {
-                clearTimer();
-                if (typeof onDone === "function") onDone();
-                return;
-            }
-            setVisual(true, formatLeft(left));
-        }, 50);
-    }
-
     function unlockIdle() {
-        pendingPlay = false;
+        lockedUntil = 0;
         setVisual(false, DEFAULT_LABEL);
     }
 
@@ -67,33 +52,58 @@
     }
 
     function doSpawn() {
-        pendingPlay = false;
-        setVisual(false, DEFAULT_LABEL);
+        clearTimer();
+        unlockIdle();
         if (typeof window.setNick === "function") {
             window.setNick(nickPayload());
         }
     }
 
-    function lockAfterDeath() {
-        pendingPlay = false;
-        runCountdown(LOCK_MS, unlockIdle);
+    function runCountdown(ms, onDone) {
+        clearTimer();
+        lockedUntil = Date.now() + ms;
+        setVisual(true, formatLeft(ms));
+
+        timerId = setInterval(function () {
+            var left = lockedUntil - Date.now();
+            if (left <= 0) {
+                clearTimer();
+                lockedUntil = 0;
+                if (typeof onDone === "function") onDone();
+                return;
+            }
+            setVisual(true, formatLeft(left));
+        }, 50);
+    }
+
+    /** После смерти / при входе: 1.5 с и авто-спавн */
+    function scheduleAutoPlay() {
+        runCountdown(LOCK_MS, doSpawn);
     }
 
     function onPlayClick() {
         var btn = playBtn();
         if (!btn) return false;
 
-        if (btn.disabled || pendingPlay || Date.now() < lockedUntil) {
+        // Во время отсчёта клик игнорируем — ждём авто-вход
+        if (btn.disabled || Date.now() < lockedUntil) {
             return false;
         }
 
-        pendingPlay = true;
-        runCountdown(LOCK_MS, doSpawn);
+        doSpawn();
         return false;
     }
 
+    function tryStartOnLoad() {
+        if (autoStarted) return;
+        if (typeof window.setNick !== "function") return;
+        autoStarted = true;
+        scheduleAutoPlay();
+    }
+
     window.AgarPlayGate = {
-        lockAfterDeath: lockAfterDeath,
+        lockAfterDeath: scheduleAutoPlay,
+        scheduleAutoPlay: scheduleAutoPlay,
         onPlayClick: onPlayClick,
         LOCK_MS: LOCK_MS,
     };
@@ -110,5 +120,13 @@
             e.preventDefault();
             onPlayClick();
         });
+
+        // setNick появляется после инициализации game — подождём
+        var tries = 0;
+        var wait = setInterval(function () {
+            tries++;
+            tryStartOnLoad();
+            if (autoStarted || tries > 100) clearInterval(wait);
+        }, 50);
     });
 })();
