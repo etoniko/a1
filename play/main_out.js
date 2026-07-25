@@ -376,6 +376,7 @@ class Game {
         this.scoreText = null;
         this.userScore = 0;
         this.accountXp = 0;
+        this._myLbNodeId = null;
         this.userNickName = null;
 		this.skinMap = {};     // nick -> codeid
         this.skinCache = {};   // codeid -> Image
@@ -995,6 +996,7 @@ setSpect() {
         this.nodelist = [];
         this.Cells = [];
         this.leaderBoard = [];
+        this._myLbNodeId = null;
     }
     manualReconnect() {
         if (this.connectInProgress) return;
@@ -1352,7 +1354,8 @@ setSpect() {
             "playerLevel": playerXp ? this.getLevel(playerXp) : -1,
             "name": chatName,
             "color": color,
-            "message": chatMessage
+            "message": chatMessage,
+            "time": Date.now()
         });
         this.drawChatBoard();
     }
@@ -1600,7 +1603,7 @@ setSpect() {
         var nowtime = Date.now();
         var lasttime = 0;
         if (this.chatBoard.length >= 1)
-            lasttime = this.chatBoard[this.chatBoard.length - 1].time;
+            lasttime = this.chatBoard[this.chatBoard.length - 1].time || nowtime;
         else return;
         var deltat = nowtime - lasttime;
         ctx.globalAlpha = 0.8 * Math.exp(-deltat / 25000);
@@ -1608,37 +1611,45 @@ setSpect() {
         var from = len - 15;
         if (from < 0) from = 0;
 
+        const STAR_GAP = 22;
         const chatEntries = [];
         for (let i = from; i < len; i++) {
             const entry = this.chatBoard[i];
             const chatName = new UText(CHAT_FONT_SIZE, entry.color);
             chatName.setValue(entry.name);
             const nameWidth = chatName.getWidth();
-            const prefixWidth = nameWidth + measureChatTextWidth(": ", CHAT_FONT_SIZE);
+            const hasLvl = entry.playerLevel != null && entry.playerLevel >= 0;
+            const starPad = hasLvl ? STAR_GAP : 0;
+            const prefixWidth = starPad + nameWidth + measureChatTextWidth(": ", CHAT_FONT_SIZE);
             const msgLines = wrapChatMessageLines(entry.message, prefixWidth, CHAT_MAX_WIDTH, CHAT_FONT_SIZE);
-            chatEntries.push({ entry, chatName, nameWidth, msgLines });
+            chatEntries.push({ entry, chatName, nameWidth, msgLines, hasLvl, starPad });
         }
 
         let yCursor = this.chatCanvas.height / scaleFactor;
         for (let e = chatEntries.length - 1; e >= 0; e--) {
-            const { chatName, nameWidth, msgLines } = chatEntries[e];
+            const { entry, chatName, nameWidth, msgLines, hasLvl, starPad } = chatEntries[e];
             const blockHeight = msgLines.length * CHAT_LINE_HEIGHT;
             yCursor -= blockHeight;
 
             for (let li = 0; li < msgLines.length; li++) {
                 const lineY = yCursor + li * CHAT_LINE_HEIGHT;
                 if (li === 0) {
+                    let x = CHAT_BASE_X;
+                    if (hasLvl) {
+                        this.drawLevelStar(ctx, x + 9, lineY + 10, entry.playerLevel, 9);
+                        x += starPad;
+                    }
                     const nameImg = chatName.render();
-                    ctx.drawImage(nameImg, CHAT_BASE_X, lineY);
+                    ctx.drawImage(nameImg, x, lineY);
                     const chatText = new UText(CHAT_FONT_SIZE, "#666666");
                     chatText.setValue(": " + msgLines[0]);
                     const textImg = chatText.render();
-                    ctx.drawImage(textImg, CHAT_BASE_X + nameWidth, lineY);
+                    ctx.drawImage(textImg, x + nameWidth, lineY);
                 } else {
                     const chatText = new UText(CHAT_FONT_SIZE, "#666666");
                     chatText.setValue(msgLines[li]);
                     const textImg = chatText.render();
-                    ctx.drawImage(textImg, CHAT_BASE_X, lineY);
+                    ctx.drawImage(textImg, CHAT_BASE_X + starPad, lineY);
                 }
             }
             yCursor -= 4;
@@ -1683,30 +1694,86 @@ setSpect() {
         ctx.closePath();
         ctx.fill();
     }
+    drawLevelStar(ctx, cx, cy, level, outerR) {
+        outerR = outerR || 12;
+        const innerR = outerR * 0.45;
+        ctx.fillStyle = this.lbStarColor(level);
+        this.drawLbStar(ctx, cx, cy, outerR, innerR);
+        const lvlStr = String(level);
+        // Keep digits inside the star — smaller for 2–3 digit levels
+        let fontPx = 8;
+        if (lvlStr.length >= 3) fontPx = 6;
+        else if (lvlStr.length === 2) fontPx = 7;
+        else if (outerR >= 12) fontPx = 9;
+        ctx.font = "bold " + fontPx + "px Ubuntu,sans-serif";
+        ctx.fillStyle = this.lbLevelTextColor(level);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(lvlStr, cx, cy + 0.5);
+        ctx.textBaseline = "alphabetic";
+        ctx.textAlign = "left";
+    }
+    findMyLeaderboardIndex() {
+        if (!this.playerCells.length || !this.leaderBoard.length) return -1;
+        const myIds = new Set(this.playerCells.map((c) => c.id));
+        for (let i = 0; i < this.leaderBoard.length; i++) {
+            const id = this.leaderBoard[i].id;
+            if (id != null && myIds.has(id)) {
+                this._myLbNodeId = id;
+                return i;
+            }
+        }
+        // Fallback: same nick (client does this for custom LB / edge cases)
+        const myName = String(this.playerCells[0]?.name || "").trim().toLowerCase();
+        if (myName) {
+            for (let i = 0; i < this.leaderBoard.length; i++) {
+                const n = String(this.leaderBoard[i].name || "").trim().toLowerCase();
+                if (n && n === myName) {
+                    if (this.leaderBoard[i].id != null) this._myLbNodeId = this.leaderBoard[i].id;
+                    return i;
+                }
+            }
+        }
+        // Keep highlight across brief LB/cell-id desync after split/merge
+        if (this._myLbNodeId != null) {
+            for (let i = 0; i < this.leaderBoard.length; i++) {
+                if (this.leaderBoard[i].id === this._myLbNodeId) return i;
+            }
+        }
+        return -1;
+    }
+    isMyLeaderboardEntry(entry, myRank, rowIndex, visibleLen) {
+        if (!entry) return false;
+        // Extra "me" row outside top-10 is always self
+        if (myRank > 10 && rowIndex === visibleLen - 1) return true;
+        if (!this.playerCells.length) return false;
+        if (entry.id != null && this.playerCells.some((c) => c.id === entry.id)) return true;
+        if (this._myLbNodeId != null && entry.id === this._myLbNodeId) return true;
+        const myName = String(this.playerCells[0]?.name || "").trim().toLowerCase();
+        const n = String(entry.name || "").trim().toLowerCase();
+        return !!(myName && n && myName === n);
+    }
     drawLeaderBoard() {
         this.lbCanvas = null;
         if (this.leaderBoard.length === 0) return;
         this.lbCanvas = document.createElement("canvas");
         var ctx = this.lbCanvas.getContext("2d");
         var boardLength = 60;
-        var myRank = null;
-        for (var i = 0; i < this.leaderBoard.length; i++) {
-            if (this.playerCells.some(cell => cell.id === this.leaderBoard[i].id)) {
-                myRank = i + 1;
-                break;
-            }
-        }
+        var myIdx = this.findMyLeaderboardIndex();
+        var myRank = myIdx >= 0 ? myIdx + 1 : null;
         var visible = this.leaderBoard.slice(0, 10);
         if (myRank && myRank > 10) {
-            var myEntry = this.leaderBoard[myRank - 1];
+            var myEntry = this.leaderBoard[myIdx];
             var myLvl = (myEntry && myEntry.level != null && myEntry.level >= 0)
                 ? myEntry.level
                 : this.lbMyLevel();
+            // Keep LB cell id so pink highlight stays tied by id (like client)
             visible.push({
-                name: this.playerCells[0]?.name,
-                id: this.playerCells[0]?.id ?? 0,
+                name: this.playerCells[0]?.name || myEntry?.name,
+                id: myEntry?.id ?? this.playerCells[0]?.id ?? this._myLbNodeId ?? null,
                 level: myLvl,
-                xp: myEntry?.xp ?? this.accountXp ?? 0
+                xp: myEntry?.xp ?? this.accountXp ?? 0,
+                _isMe: true
             });
         }
         boardLength += 32 * visible.length;
@@ -1728,7 +1795,7 @@ setSpect() {
             var entry = visible[i];
             var name = entry.name || "An unnamed cell";
             if (!this.showName) name = "An unnamed cell";
-            var isMe = this.playerCells.some(cell => cell.id === entry.id);
+            var isMe = entry._isMe || this.isMyLeaderboardEntry(entry, myRank, i, visible.length);
             if (isMe && this.playerCells[0]?.name) {
                 name = this.playerCells[0].name;
             }
@@ -1741,19 +1808,10 @@ setSpect() {
             var level = this.lbEntryLevel(entry, isMe);
             var nameX = 8 + ctx.measureText(rankLabel).width + 4;
             if (level != null && level >= 0) {
-                var cx = nameX + 14;
+                var cx = nameX + 12;
                 var cy = y - 6;
-                ctx.fillStyle = this.lbStarColor(level);
-                this.drawLbStar(ctx, cx, cy, 14, 6.5);
-                var lvlStr = String(level);
-                ctx.font = (lvlStr.length >= 3 ? "bold 11px" : "bold 13px") + " Ubuntu,sans-serif";
-                ctx.fillStyle = this.lbLevelTextColor(level);
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText(lvlStr, cx, cy + 0.5);
-                ctx.textBaseline = "alphabetic";
-                ctx.textAlign = "left";
-                nameX += 34;
+                this.drawLevelStar(ctx, cx, cy, level, 12);
+                nameX += 30;
             }
             ctx.font = canvasFont(18);
             ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
