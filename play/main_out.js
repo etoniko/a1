@@ -375,6 +375,7 @@ class Game {
         this.chatCanvas = null;
         this.scoreText = null;
         this.userScore = 0;
+        this.accountXp = 0;
         this.userNickName = null;
 		this.skinMap = {};     // nick -> codeid
         this.skinCache = {};   // codeid -> Image
@@ -1170,9 +1171,21 @@ setSpect() {
         msg.setUint8(0, 255);
         msg.setUint32(1, 0, true);
         this.wsSend(msg);
+        this.sendAccountToken();
         this.joinCurrentServer();
         console.info("Connection successful!");
         setTimeout(() => { this.sendChat("вошёл в игру!"); }, 1000);
+    }
+    sendAccountToken() {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        const token = localStorage.getItem("accountToken") || "";
+        if (!token) return;
+        const msg = this.prepareData(1 + 2 * token.length);
+        msg.setUint8(0, 114);
+        for (let i = 0; i < token.length; ++i) {
+            msg.setUint16(1 + 2 * i, token.charCodeAt(i), true);
+        }
+        this.wsSend(msg);
     }
     onWsClose() {
         console.log("WebSocket closed");
@@ -1631,6 +1644,20 @@ setSpect() {
             yCursor -= 4;
         }
     }
+    lbMyLevel() {
+        let xp = this.accountXp | 0;
+        if (xp <= 0 && window.AgarCabinet && typeof window.AgarCabinet.getXp === "function") {
+            xp = window.AgarCabinet.getXp() | 0;
+        }
+        const loggedIn = !!(localStorage.getItem("accountToken"));
+        if (!loggedIn && xp <= 0) return -1;
+        return this.getLevel(xp);
+    }
+    lbEntryLevel(entry, isMe) {
+        if (entry && entry.level != null && entry.level >= 0) return entry.level;
+        if (isMe) return this.lbMyLevel();
+        return -1;
+    }
     lbStarColor(level) {
         if (level >= 200) return "#222222";
         if (level >= 150) return "#FFFFFF";
@@ -1672,26 +1699,29 @@ setSpect() {
         var visible = this.leaderBoard.slice(0, 10);
         if (myRank && myRank > 10) {
             var myEntry = this.leaderBoard[myRank - 1];
+            var myLvl = (myEntry && myEntry.level != null && myEntry.level >= 0)
+                ? myEntry.level
+                : this.lbMyLevel();
             visible.push({
                 name: this.playerCells[0]?.name,
                 id: this.playerCells[0]?.id ?? 0,
-                level: myEntry?.level ?? -1,
-                xp: myEntry?.xp ?? 0
+                level: myLvl,
+                xp: myEntry?.xp ?? this.accountXp ?? 0
             });
         }
-        boardLength += 26 * visible.length;
+        boardLength += 32 * visible.length;
         var scale = Math.min(0.22 * this.canvasHeight, Math.min(200, 0.3 * this.canvasWidth)) * 0.005;
-        this.lbCanvas.width = 230 * scale;
+        this.lbCanvas.width = 250 * scale;
         this.lbCanvas.height = boardLength * scale;
         ctx.scale(scale, scale);
         ctx.globalAlpha = 0.4;
         ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, 230, boardLength);
+        ctx.fillRect(0, 0, 250, boardLength);
         ctx.globalAlpha = 1;
         ctx.fillStyle = "#FFFFFF";
         ctx.font = canvasFont(30);
         ctx.textAlign = "center";
-        ctx.fillText("Leaderboard", 115, 40);
+        ctx.fillText("Leaderboard", 125, 40);
         ctx.textAlign = "left";
         ctx.font = canvasFont(18);
         for (var i = 0; i < visible.length; i++) {
@@ -1702,31 +1732,32 @@ setSpect() {
             if (isMe && this.playerCells[0]?.name) {
                 name = this.playerCells[0].name;
             }
-            var y = 70 + 26 * i;
+            var y = 72 + 32 * i;
             var rankNum = (isMe && myRank > 10 && i === visible.length - 1) ? myRank : (i + 1);
             var rankLabel = (!this.noRanking ? rankNum + ". " : "");
             ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
             ctx.fillText(rankLabel, 8, y);
 
-            var level = entry.level;
-            var nameX = 8 + ctx.measureText(rankLabel).width + 2;
+            var level = this.lbEntryLevel(entry, isMe);
+            var nameX = 8 + ctx.measureText(rankLabel).width + 4;
             if (level != null && level >= 0) {
-                var cx = nameX + 9;
-                var cy = y - 5;
+                var cx = nameX + 14;
+                var cy = y - 6;
                 ctx.fillStyle = this.lbStarColor(level);
-                this.drawLbStar(ctx, cx, cy, 9, 4);
-                ctx.font = "bold 9px Ubuntu,sans-serif";
+                this.drawLbStar(ctx, cx, cy, 14, 6.5);
+                var lvlStr = String(level);
+                ctx.font = (lvlStr.length >= 3 ? "bold 11px" : "bold 13px") + " Ubuntu,sans-serif";
                 ctx.fillStyle = this.lbLevelTextColor(level);
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillText(String(level), cx, cy + 0.5);
+                ctx.fillText(lvlStr, cx, cy + 0.5);
                 ctx.textBaseline = "alphabetic";
                 ctx.textAlign = "left";
-                nameX += 24;
+                nameX += 34;
             }
             ctx.font = canvasFont(18);
             ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
-            var maxW = 220 - nameX;
+            var maxW = 240 - nameX;
             while (name.length > 1 && ctx.measureText(name).width > maxW) {
                 name = name.slice(0, -1);
             }
@@ -1883,6 +1914,7 @@ setSpect() {
         if (window.AgarCabinet && typeof window.AgarCabinet.setXp === "function") {
             window.AgarCabinet.setXp(this.accountXp);
         }
+        if (this.leaderBoard.length) this.drawLeaderBoard();
     }
 }
 class BinaryReader {

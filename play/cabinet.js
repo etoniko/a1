@@ -225,6 +225,12 @@
     function updateXpUi(xp) {
         state.xp = Math.max(0, xp | 0);
         const p = xpProgress(state.xp);
+        if (window.game) {
+            window.game.accountXp = state.xp;
+            if (window.game.leaderBoard && window.game.leaderBoard.length && typeof window.game.drawLeaderBoard === "function") {
+                window.game.drawLeaderBoard();
+            }
+        }
 
         const menuFill = $("#progressBar .progress-bar");
         const menuText = $("#progressBar .progress-bar-text");
@@ -866,13 +872,13 @@
         window.onVkAuth = completeVkLogin;
         handleVkUrlCallback();
         loadAccountProfile();
-        updateXpUi(0);
         setTab("profile");
 
         window.AgarCabinet = {
             open: openCabinet,
             close: closeCabinet,
             setXp: updateXpUi,
+            getXp: () => state.xp,
             setUid: (uid) => { state.uid = uid; if (el.statUid) el.statUid.textContent = uid != null ? String(uid) : "—"; },
             rememberSkin: rememberPlayedNick,
             refresh: refreshAll
