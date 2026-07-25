@@ -2,6 +2,10 @@
     const SKIN_CDN = "https://api.agar.su/skins/";
     const SKIN_FALLBACK = "https://api.agar.su/skins/4.png";
     const TOP100_URL = "https://api.agar.su/api/top100";
+    const SKINLIST_URL = "https://api.agar.su/skinlist.txt";
+    const PASS_URL = "https://api.agar.su/pass.txt";
+    const INVISIBLE_URL = "https://api.agar.su/invisible.txt";
+    const ROTATION_URL = "https://api.agar.su/rotation.txt";
     const PLAYED_KEY = "agarPlayedSkins";
     const MAX_PLAYED = 30;
 
@@ -121,7 +125,15 @@
         accountAvatar: null,
         tab: "profile",
         skinMap: null,
+        skinEntries: null,
+        freeSkins: null,
+        passSet: null,
+        invisibleSet: null,
+        rotationSet: null,
+        skinsFilter: "",
         rating: null,
+        nicknames: null,
+        invTab: "nicks",
         vkReady: false,
         selectedSkin: localStorage.getItem("cabinetSkin") || ""
     };
@@ -158,37 +170,100 @@
         });
     }
 
-    async function ensureSkinMap() {
-        if (state.skinMap) return state.skinMap;
-        const map = Object.create(null);
-        const g = window.game;
-        if (g && g.skinMap && Object.keys(g.skinMap).length) {
-            Object.keys(g.skinMap).forEach((k) => { map[k] = g.skinMap[k]; });
-            state.skinMap = map;
-            return map;
+    async function fetchTxtLines(url) {
+        const res = await fetch(url, { cache: "no-store" });
+        const text = await res.text();
+        return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    }
+    async function ensurePerkLists() {
+        if (state.passSet && state.invisibleSet && state.rotationSet) {
+            return {
+                pass: state.passSet,
+                invisible: state.invisibleSet,
+                rotation: state.rotationSet
+            };
         }
         try {
-            const res = await fetch("https://api.agar.su/skinlist.txt", { cache: "no-store" });
+            const [passLines, invLines, rotLines] = await Promise.all([
+                fetchTxtLines(PASS_URL),
+                fetchTxtLines(INVISIBLE_URL),
+                fetchTxtLines(ROTATION_URL)
+            ]);
+            state.passSet = new Set(passLines.map((n) => n.toLowerCase()));
+            state.invisibleSet = new Set(invLines.map((n) => n.toLowerCase()));
+            state.rotationSet = new Set(rotLines.map((n) => n.toLowerCase()));
+        } catch (e) {
+            state.passSet = state.passSet || new Set();
+            state.invisibleSet = state.invisibleSet || new Set();
+            state.rotationSet = state.rotationSet || new Set();
+        }
+        return {
+            pass: state.passSet,
+            invisible: state.invisibleSet,
+            rotation: state.rotationSet
+        };
+    }
+    function nickInSet(set, nickname) {
+        const lower = String(nickname || "").toLowerCase();
+        if (set.has(lower)) return true;
+        const clean = lower.replace(/\[|\]/g, "").trim();
+        return set.has(clean) || set.has("[" + clean + "]");
+    }
+
+    async function ensureSkinMap() {
+        if (state.skinMap && state.skinEntries) return state.skinMap;
+        const map = Object.create(null);
+        const entries = [];
+        try {
+            const res = await fetch(SKINLIST_URL, { cache: "no-store" });
             const text = await res.text();
             text.split(/\r?\n/).forEach((line) => {
                 const idx = line.indexOf(":");
                 if (idx < 0) return;
                 const nick = line.slice(0, idx).trim();
                 const code = line.slice(idx + 1).trim();
+                if (!nick || !code) return;
                 const key = normalizeNick(nick);
-                if (key && code) map[key] = code;
+                if (key) map[key] = code;
+                map[nick.toLowerCase()] = code;
+                entries.push({ nick, code: String(code) });
             });
-        } catch (e) { /* empty map */ }
+        } catch (e) { /* empty */ }
+        const g = window.game;
+        if (g && g.skinMap) {
+            Object.keys(g.skinMap).forEach((k) => {
+                if (!map[k]) map[k] = g.skinMap[k];
+            });
+        }
         state.skinMap = map;
+        state.skinEntries = entries.reverse();
         return map;
+    }
+    async function ensureFreeSkins() {
+        await ensureSkinMap();
+        await ensurePerkLists();
+        if (state.freeSkins) return state.freeSkins;
+        const pass = state.passSet || new Set();
+        state.freeSkins = (state.skinEntries || []).filter((s) => {
+            const raw = String(s.nick || "");
+            return !pass.has(raw.toLowerCase()) && !pass.has(normalizeNick(raw));
+        });
+        return state.freeSkins;
     }
     async function resolveSkinCode(nickOrKey) {
         const map = await ensureSkinMap();
-        const key = normalizeNick(nickOrKey);
-        return key ? (map[key] || null) : null;
+        const raw = String(nickOrKey || "").trim();
+        const key = normalizeNick(raw);
+        return (key && map[key]) || map[raw.toLowerCase()] || null;
     }
     function skinUrl(code) {
         return code ? SKIN_CDN + encodeURIComponent(code) + ".png" : "";
+    }
+    function skinUrlForNick(nickname) {
+        const map = state.skinMap || {};
+        const clean = String(nickname || "").replace(/\[|\]/g, "").trim().toLowerCase();
+        const code = map[clean] || map["[" + clean + "]"] || map[normalizeNick(nickname)];
+        return code ? skinUrl(code) : null;
     }
 
     function currentNick() {
@@ -272,7 +347,9 @@
             state.accountName = null;
             state.accountAvatar = null;
             state.uid = null;
+            state.nicknames = null;
             updateAuthUi();
+            renderInventory();
             return;
         }
         try {
@@ -286,7 +363,9 @@
                 state.accountName = null;
                 state.accountAvatar = null;
                 state.uid = null;
+                state.nicknames = null;
                 updateAuthUi();
+                renderInventory();
                 return;
             }
             state.accountName = data.account_name || null;
@@ -294,8 +373,10 @@
             state.uid = data.uid != null ? data.uid : null;
             if (data.xp != null) updateXpUi(data.xp);
             else updateAuthUi();
+            await loadMyNicknames(true);
         } catch (e) {
             updateAuthUi();
+            renderInventory();
         }
     }
 
@@ -304,10 +385,11 @@
         state.accountName = null;
         state.accountAvatar = null;
         state.uid = null;
+        state.nicknames = null;
         state.vkReady = false;
         updateXpUi(state.xp);
         updateAuthUi();
-        // Widget re-inits when cabinet is open on profile
+        renderInventory();
         if (el.root && el.root.classList.contains("is-open")) {
             ensureVkWidget(true);
         }
@@ -503,29 +585,274 @@
     async function renderSkins() {
         if (!el.skinsGrid) return;
         el.skinsGrid.innerHTML = '<div class="cabinet-skin-empty">Загрузка…</div>';
-        await ensureSkinMap();
-        const played = loadPlayed();
-        const skins = [];
-        const seen = new Set();
-        for (const item of played) {
-            const key = normalizeNick(item.nick);
-            if (!key || seen.has(key)) continue;
-            const code = item.code || state.skinMap[key];
-            if (!code) continue;
-            seen.add(key);
-            skins.push({ nick: item.nick, code: String(code) });
-        }
-        if (!skins.length) {
-            el.skinsGrid.innerHTML = '<div class="cabinet-skin-empty">Пока пусто.<br>Сыграй под ником со скином — он появится здесь.<br>Или закажи скин в магазине.</div>';
+        let skins;
+        try {
+            skins = await ensureFreeSkins();
+        } catch (e) {
+            el.skinsGrid.innerHTML = '<div class="cabinet-skin-empty">Не удалось загрузить скины.</div>';
             return;
         }
-        el.skinsGrid.innerHTML = skins.map((s) => {
-            const sel = state.selectedSkin === s.code ? " is-selected" : "";
-            return '<button type="button" class="cabinet-skin' + sel + '" data-code="' + escapeHtml(s.code) +
-                '" data-nick="' + escapeHtml(s.nick) +
-                '" style="background-image:url(\'' + skinUrl(s.code) + '\')" title="' +
+        const q = String(state.skinsFilter || "").trim().toLowerCase();
+        const filtered = q
+            ? skins.filter((s) => String(s.nick).toLowerCase().includes(q))
+            : skins;
+        if (!filtered.length) {
+            el.skinsGrid.innerHTML = '<div class="cabinet-skin-empty">' +
+                (q ? "Ничего не найдено." : "Список пуст.") + "</div>";
+            return;
+        }
+        const limit = 400;
+        const slice = filtered.slice(0, limit);
+        el.skinsGrid.innerHTML = slice.map((s) => {
+            const sel = state.selectedSkin && String(state.selectedSkin) === String(s.code) ? " is-selected" : "";
+            return '<button type="button" class="cabinet-skin' + sel + '" data-nick="' +
+                escapeHtml(s.nick) + '" data-code="' + escapeHtml(s.code) +
+                '" style="background-image:url(\'' + skinUrl(s.code).replace(/'/g, "%27") + '\')" title="' +
                 escapeHtml(s.nick) + '"><span class="tag">' + escapeHtml(s.nick) + "</span></button>";
-        }).join("");
+        }).join("") + (filtered.length > limit
+            ? '<div class="cabinet-skin-empty">Показано ' + limit + ' из ' + filtered.length + '. Уточните поиск.</div>'
+            : "");
+    }
+
+    function openShopForNick(nickPart, isClan, opts) {
+        opts = opts || {};
+        setTab("shop");
+        const nickField = document.getElementById("cabNickname");
+        const passField = document.getElementById("cabPassword");
+        if (nickField) nickField.value = nickPart || "";
+        if (opts.focusPassword && passField) passField.focus();
+        const type = isClan ? "clan" : "personal";
+        const radio = document.querySelector('input[name="cabServiceType"][value="' + type + '"]');
+        if (radio) radio.checked = true;
+        const inv = document.getElementById("cabInvisible");
+        const rot = document.getElementById("cabRotation");
+        if (inv && opts.invisible) inv.checked = true;
+        if (rot && opts.rotation) rot.checked = true;
+        calculateShop();
+    }
+
+    function applyOwnedNick(fullNick, pass) {
+        const nickPart = String(fullNick || "").split("#")[0].trim();
+        const nickField = document.getElementById("nick");
+        const passField = document.getElementById("pass");
+        if (nickField) {
+            nickField.value = nickPart;
+            nickField.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        if (passField) {
+            passField.value = pass || "";
+            passField.style.display = pass ? "block" : "";
+        }
+        updateHomeSkinPreview();
+        closeCabinet();
+    }
+
+    function getNickPerks(nickname, password) {
+        const lists = {
+            pass: state.passSet || new Set(),
+            invisible: state.invisibleSet || new Set(),
+            rotation: state.rotationSet || new Set()
+        };
+        const pass = String(password ?? "").trim();
+        const hasSkin = !!(skinUrlForNick(nickname));
+        return {
+            hasSkinPass: nickInSet(lists.pass, nickname) || !!pass,
+            hasSkin,
+            invisible: nickInSet(lists.invisible, nickname),
+            rotation: nickInSet(lists.rotation, nickname)
+        };
+    }
+
+    function renderNickCard(listEl, nickname, password) {
+        const full = String(nickname || "").trim();
+        const pass = String(password || "").trim();
+        const isClan = /\[[^\]]+\]/.test(full);
+        const label = full || "?";
+        const perks = getNickPerks(full, pass);
+        const li = document.createElement("li");
+        li.className = "cab-nick-card";
+
+        const url = skinUrlForNick(full);
+        if (url) {
+            const img = document.createElement("img");
+            img.className = "skin";
+            img.loading = "lazy";
+            img.src = url;
+            img.alt = "";
+            li.appendChild(img);
+        } else {
+            const av = document.createElement("div");
+            av.className = "skin skin--empty";
+            av.textContent = label.charAt(0).toUpperCase();
+            li.appendChild(av);
+        }
+
+        const body = document.createElement("div");
+        body.className = "cab-nick-card-body";
+        const name = document.createElement("div");
+        name.className = "nick";
+        name.textContent = label;
+        name.title = "Выбрать для игры";
+        name.addEventListener("click", () => applyOwnedNick(full, pass));
+
+        const perksRow = document.createElement("div");
+        perksRow.className = "cab-nick-perks";
+        const addPerk = (labelText, on, buyOpts) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "cab-nick-perk" + (on ? " is-on" : "") + (buyOpts ? " is-action" : "");
+            btn.textContent = labelText;
+            if (buyOpts) {
+                btn.title = on ? "Сменить / докупить" : "Купить";
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    openShopForNick(full, isClan, buyOpts);
+                });
+            } else if (on) {
+                btn.title = "Куплено";
+            }
+            perksRow.appendChild(btn);
+        };
+        addPerk("Пароль", perks.hasSkinPass, { focusPassword: true });
+        addPerk("Скин", perks.hasSkin, { focusSkin: true });
+        addPerk("Невидимый", perks.invisible, perks.invisible ? null : { invisible: true });
+        addPerk("Поворот", perks.rotation, perks.rotation ? null : { rotation: true });
+
+        body.append(name, perksRow);
+        li.appendChild(body);
+
+        const passBox = document.createElement("div");
+        passBox.className = "cab-passbox";
+        const input = document.createElement("input");
+        input.type = "password";
+        input.readOnly = true;
+        input.value = pass;
+        input.placeholder = "—";
+        const eye = document.createElement("button");
+        eye.type = "button";
+        eye.textContent = "👁";
+        eye.title = "Показать пароль";
+        eye.addEventListener("click", () => {
+            const show = input.type === "password";
+            input.type = show ? "text" : "password";
+        });
+        passBox.append(input, eye);
+        li.appendChild(passBox);
+        listEl.appendChild(li);
+    }
+
+    function setInvTab(tab) {
+        state.invTab = tab;
+        $all(".cab-inv-tab", el.root).forEach((btn) => {
+            btn.classList.toggle("is-active", btn.dataset.inv === tab);
+        });
+        $all(".cab-inv-list", el.root).forEach((list) => {
+            list.classList.toggle("is-active", list.dataset.invPanel === tab);
+        });
+    }
+
+    function renderInventory() {
+        const hint = document.getElementById("cabInvHint");
+        const tabs = document.getElementById("cabInvTabs");
+        const panels = document.getElementById("cabInvPanels");
+        const nickList = document.getElementById("myNickList");
+        const clanList = document.getElementById("myClanList");
+        const badgeNick = document.getElementById("badgeNick");
+        const badgeClan = document.getElementById("badgeClan");
+        if (!nickList || !clanList) return;
+
+        if (!getAccountToken()) {
+            if (hint) {
+                hint.hidden = false;
+                hint.textContent = "Войдите, чтобы увидеть ники, кланы и скины";
+            }
+            if (tabs) tabs.hidden = true;
+            if (panels) panels.hidden = true;
+            nickList.innerHTML = "";
+            clanList.innerHTML = "";
+            return;
+        }
+
+        if (hint) hint.hidden = true;
+        if (tabs) tabs.hidden = false;
+        if (panels) panels.hidden = false;
+
+        nickList.innerHTML = "";
+        clanList.innerHTML = "";
+        let nickCount = 0;
+        let clanCount = 0;
+        const rows = Array.isArray(state.nicknames) ? state.nicknames : null;
+
+        if (!rows) {
+            nickList.innerHTML = '<li class="empty">Загрузка…</li>';
+            return;
+        }
+        if (!rows.length) {
+            nickList.innerHTML = '<li class="empty">Вы не покупали ники</li>';
+            clanList.innerHTML = '<li class="empty">Вы не покупали кланы</li>';
+            if (badgeNick) badgeNick.textContent = "0";
+            if (badgeClan) badgeClan.textContent = "0";
+            setInvTab(state.invTab || "nicks");
+            return;
+        }
+
+        rows.forEach((row) => {
+            const full = String(row.nickname || "").trim();
+            const pass = String(row.password ?? "").trim();
+            if (!full) return;
+            if (/\[[^\]]+\]/.test(full)) {
+                renderNickCard(clanList, full, pass);
+                clanCount++;
+            } else {
+                renderNickCard(nickList, full, pass);
+                nickCount++;
+            }
+        });
+        if (!nickCount) nickList.innerHTML = '<li class="empty">Вы не покупали ники</li>';
+        if (!clanCount) clanList.innerHTML = '<li class="empty">Вы не покупали кланы</li>';
+        if (badgeNick) badgeNick.textContent = String(nickCount);
+        if (badgeClan) badgeClan.textContent = String(clanCount);
+        setInvTab(state.invTab || "nicks");
+    }
+
+    async function loadMyNicknames(force) {
+        if (!getAccountToken()) {
+            state.nicknames = null;
+            renderInventory();
+            return;
+        }
+        if (!force && Array.isArray(state.nicknames)) {
+            renderInventory();
+            return;
+        }
+        renderInventory();
+        try {
+            await Promise.all([ensureSkinMap(), ensurePerkLists()]);
+            const res = await fetch("https://api.agar.su/api/me/nicknames", {
+                headers: { Authorization: "Game " + getAccountToken() },
+                cache: "no-store"
+            });
+            if (res.status === 401) {
+                setAccountToken("");
+                state.nicknames = null;
+                updateAuthUi();
+                renderInventory();
+                return;
+            }
+            if (!res.ok) throw new Error("nicknames " + res.status);
+            const data = await res.json();
+            state.nicknames = Array.isArray(data?.nicknames) ? data.nicknames : [];
+            renderInventory();
+        } catch (e) {
+            const nickList = document.getElementById("myNickList");
+            if (nickList) nickList.innerHTML = '<li class="error">Не удалось загрузить никнеймы</li>';
+            const tabs = document.getElementById("cabInvTabs");
+            const panels = document.getElementById("cabInvPanels");
+            const hint = document.getElementById("cabInvHint");
+            if (hint) hint.hidden = true;
+            if (tabs) tabs.hidden = false;
+            if (panels) panels.hidden = false;
+        }
     }
 
     /* —— Shop —— */
@@ -743,13 +1070,17 @@
         if (tab === "skins") renderSkins();
         if (tab === "rating") renderRating();
         if (tab === "shop") calculateShop();
-        if (tab === "profile") requestAnimationFrame(() => ensureVkWidget(false));
+        if (tab === "profile") {
+            requestAnimationFrame(() => ensureVkWidget(false));
+            loadMyNicknames(false);
+        }
     }
 
     function refreshAll() {
         updateXpUi(state.xp);
         if (state.tab === "rating") renderRating();
         if (state.tab === "skins") renderSkins();
+        if (state.tab === "profile") loadMyNicknames(false);
     }
 
     function bindOpeners() {
@@ -848,6 +1179,20 @@
         });
         const logoutBtn = $("#cabLogoutBtn", el.root);
         if (logoutBtn) logoutBtn.addEventListener("click", logoutAccount);
+        $all(".cab-inv-tab", el.root).forEach((btn) => {
+            btn.addEventListener("click", () => setInvTab(btn.dataset.inv));
+        });
+        const skinsSearch = $("#cabinetSkinsSearch", el.root);
+        if (skinsSearch) {
+            let st = null;
+            skinsSearch.addEventListener("input", () => {
+                clearTimeout(st);
+                st = setTimeout(() => {
+                    state.skinsFilter = skinsSearch.value || "";
+                    renderSkins();
+                }, 180);
+            });
+        }
         if (el.skinsGrid) {
             el.skinsGrid.addEventListener("click", (e) => {
                 const btn = e.target.closest(".cabinet-skin");
@@ -868,11 +1213,12 @@
         bindShop();
         bindOpeners();
         bindNickSkin();
-        ensureSkinMap();
+        ensureFreeSkins();
         window.onVkAuth = completeVkLogin;
         handleVkUrlCallback();
         loadAccountProfile();
         setTab("profile");
+        renderInventory();
 
         window.AgarCabinet = {
             open: openCabinet,

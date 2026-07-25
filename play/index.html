@@ -12,7 +12,7 @@
 	<link rel="canonical" href="https://агарио.рф/play/">
     <link rel="preload" href="https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf" as="font" type="font/ttf" crossorigin>
     <link href="./index.css?10" rel="stylesheet">
-    <link href="./cabinet.css?5" rel="stylesheet">
+    <link href="./cabinet.css?6" rel="stylesheet">
     <script src="./antimat.js?2"></script>
     <script src="./main_out.js?20"></script>
     <script src="https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js"></script>
@@ -514,6 +514,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="cabinet-stat"><b id="cabinetStatUid">—</b><span>ID</span></div>
                     </div>
                 </div>
+                <div class="cabinet-card cab-inv" id="cabInventory">
+                    <h3>Мои покупки</h3>
+                    <p class="cabinet-muted" id="cabInvHint">Войдите, чтобы увидеть ники, кланы и скины</p>
+                    <div class="cab-inv-tabs" id="cabInvTabs" hidden>
+                        <button type="button" class="cab-inv-tab is-active" data-inv="nicks">Ники <span class="cab-inv-badge" id="badgeNick">0</span></button>
+                        <button type="button" class="cab-inv-tab" data-inv="clans">Кланы <span class="cab-inv-badge" id="badgeClan">0</span></button>
+                    </div>
+                    <div class="cab-inv-panels" id="cabInvPanels" hidden>
+                        <ul class="cab-inv-list is-active" id="myNickList" data-inv-panel="nicks"></ul>
+                        <ul class="cab-inv-list" id="myClanList" data-inv-panel="clans"></ul>
+                    </div>
+                </div>
             </section>
             <section id="cab-rating" class="cabinet-section">
                 <div class="cabinet-card">
@@ -526,8 +538,9 @@ document.addEventListener('DOMContentLoaded', () => {
             </section>
             <section id="cab-skins" class="cabinet-section">
                 <div class="cabinet-card">
-                    <h3>Скины</h3>
-                    <p class="cabinet-muted" style="margin-bottom:10px">Ники, под которыми ты играл</p>
+                    <h3>Галерея бесплатных скинов</h3>
+                    <p class="cabinet-muted" style="margin-bottom:10px">Все скины без пароля (как в клиенте)</p>
+                    <input type="search" id="cabinetSkinsSearch" class="cab-skins-search" placeholder="Поиск по нику…" autocomplete="off">
                     <div class="cabinet-skins-grid" id="cabinetSkinsGrid"></div>
                 </div>
             </section>
@@ -584,6 +597,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 </div>
-<script src="./cabinet.js?6"></script>
+<script src="./cabinet.js?7"></script>
 </body>
 </html>
