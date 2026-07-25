@@ -69,6 +69,123 @@ body {
     z-index: 1;
 }
 
+/* In-game leaderboard (DOM — rounded, readable levels) */
+#gameLeaderboard {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 40;
+    width: min(236px, 46vw);
+    padding: 12px 14px 10px;
+    border-radius: 18px;
+    background: rgba(10, 14, 22, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    font-family: Ubuntu, "Segoe UI", sans-serif;
+    pointer-events: none;
+    display: none;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity .18s ease, transform .18s ease;
+}
+#gameLeaderboard.is-visible {
+    display: block;
+    opacity: 1;
+    transform: none;
+}
+#gameLeaderboard .glb-title {
+    text-align: center;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin: 0 0 8px;
+    color: rgba(255, 255, 255, 0.92);
+}
+#gameLeaderboard .glb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+#gameLeaderboard .glb-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 22px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+#gameLeaderboard .glb-row.is-me {
+    color: #ffb6b6;
+}
+#gameLeaderboard .glb-rank {
+    flex: 0 0 26px;
+    text-align: right;
+    color: rgba(255, 255, 255, 0.72);
+    font-variant-numeric: tabular-nums;
+}
+#gameLeaderboard .glb-row.is-me .glb-rank {
+    color: #ffb6b6;
+}
+#gameLeaderboard .glb-lvl {
+    flex: 0 0 42px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    box-sizing: border-box;
+    padding: 0 7px;
+}
+#gameLeaderboard .glb-lvl.is-empty {
+    background: transparent;
+    visibility: hidden;
+}
+#gameLeaderboard .glb-lvl .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.9;
+    flex-shrink: 0;
+}
+#gameLeaderboard .glb-lvl.t0 {
+    background: rgba(245, 196, 74, 0.18);
+    color: #f0d078;
+}
+#gameLeaderboard .glb-lvl.t1 {
+    background: rgba(94, 200, 192, 0.18);
+    color: #7ed8d0;
+}
+#gameLeaderboard .glb-lvl.t2 {
+    background: rgba(232, 120, 120, 0.18);
+    color: #f0a0a0;
+}
+#gameLeaderboard .glb-lvl.t3 {
+    background: rgba(230, 230, 235, 0.16);
+    color: #ececf0;
+}
+#gameLeaderboard .glb-lvl.t4 {
+    background: rgba(40, 40, 48, 0.55);
+    color: #c8c8d0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+#gameLeaderboard .glb-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 #chat_textbox {
     transition: all .5s ease-in-out;
     position: absolute;
