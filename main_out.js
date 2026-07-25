@@ -1324,13 +1324,19 @@ setSpect() {
         const pId = view.getUint16(offset, true);
         offset += 2;
         color = '#' + color;
+        var chatName = getString();
+        var chatMessage = getString();
+        if (window.AgarAntimat && typeof window.AgarAntimat.censor === "function") {
+            chatName = window.AgarAntimat.censor(chatName);
+            chatMessage = window.AgarAntimat.censor(chatMessage);
+        }
         this.chatBoard.push({
             "pId": pId,
             "playerXp": playerXp,
             "playerLevel": playerXp ? this.getLevel(playerXp) : -1,
-            "name": getString(),
+            "name": chatName,
             "color": color,
-            "message": getString()
+            "message": chatMessage
         });
         this.drawChatBoard();
     }
