@@ -377,6 +377,9 @@ class Game {
         this.userScore = 0;
         this.accountXp = 0;
         this._myLbNodeId = null;
+        this._miniMapEls = null;
+        this._miniMapLastCell = "";
+        this._miniMapLastSpan = null;
         this.userNickName = null;
 		this.skinMap = {};     // nick -> codeid
         this.skinCache = {};   // codeid -> Image
@@ -1518,6 +1521,7 @@ setSpect() {
         this.drawTouch(this.ctx);
         this.lbCanvas && this.lbCanvas.width && this.ctx.drawImage(this.lbCanvas, this.canvasWidth - this.lbCanvas.width - 10, 10);
         if (this.chatCanvas != null) this.ctx.drawImage(this.chatCanvas, 0, this.canvasHeight - this.chatCanvas.height - 50);
+        this.updateMiniMap();
         this.userScore = Math.max(this.userScore, this.calcUserScore());
         let displayText = '';
         if (this.userScore > 0) {
@@ -1588,6 +1592,65 @@ setSpect() {
     calcUserScore() {
         for (var score = 0, i = 0; i < this.playerCells.length; i++) score += this.playerCells[i].nSize * this.playerCells[i].nSize;
         return score;
+    }
+    updateMiniMap() {
+        const mapEl = document.getElementById("map");
+        if (!mapEl) return;
+        const showPc = window.innerWidth >= 768 && !this.hasOverlay && this.playerCells.length > 0;
+        mapEl.classList.toggle("is-visible", showPc);
+        mapEl.setAttribute("aria-hidden", showPc ? "false" : "true");
+        if (!showPc) return;
+
+        if (!this._miniMapEls || !this._miniMapEls.dot?.isConnected) {
+            const container = mapEl.querySelector(".map-container");
+            const cells = container ? container.querySelectorAll(":scope > div > span") : [];
+            const cellMap = new Map();
+            cells.forEach((span) => {
+                const key = span.textContent?.trim();
+                if (key) cellMap.set(key, span);
+            });
+            this._miniMapEls = {
+                container,
+                dot: document.getElementById("mapposition"),
+                cellMap,
+                width: 0,
+                height: 0
+            };
+            if (this._miniMapEls.dot) {
+                this._miniMapEls.dot.style.left = "0";
+                this._miniMapEls.dot.style.top = "0";
+            }
+        }
+        const els = this._miniMapEls;
+        if (!els.dot || !els.container) return;
+
+        const totalMapWidth = this.rightPos - this.leftPos;
+        const totalMapHeight = this.bottomPos - this.topPos;
+        if (!(totalMapWidth > 0) || !(totalMapHeight > 0)) return;
+
+        if (!els.width || !els.height) {
+            els.width = els.container.offsetWidth;
+            els.height = els.container.offsetHeight;
+        }
+        const w = els.width;
+        const h = els.height;
+        if (!w || !h) return;
+
+        const miniX = Math.round((this.nodeX - this.leftPos) / totalMapWidth * w);
+        const miniY = Math.round((this.nodeY - this.topPos) / totalMapHeight * h);
+        const r = 5;
+        els.dot.style.transform = "translate3d(" + (miniX - r) + "px," + (miniY - r) + "px,0)";
+
+        const colIndex = Math.min(4, Math.max(0, Math.floor(miniX / (w / 5))));
+        const rowIndex = Math.min(4, Math.max(0, Math.floor(miniY / (h / 5))));
+        const letters = "ABCDE";
+        const currentCell = letters.charAt(rowIndex) + (colIndex + 1);
+        if (this._miniMapLastCell !== currentCell) {
+            if (this._miniMapLastSpan) this._miniMapLastSpan.style.color = "";
+            this._miniMapLastSpan = els.cellMap.get(currentCell) || null;
+            if (this._miniMapLastSpan) this._miniMapLastSpan.style.color = "gold";
+            this._miniMapLastCell = currentCell;
+        }
     }
     drawChatBoard() {
         if (this.hideChat) {
@@ -1791,21 +1854,22 @@ setSpect() {
                 _isMe: true
             });
         }
-        boardLength += 32 * visible.length;
-        var scale = Math.min(0.22 * this.canvasHeight, Math.min(200, 0.3 * this.canvasWidth)) * 0.005;
-        this.lbCanvas.width = 250 * scale;
+        boardLength += 28 * visible.length;
+        // Slightly smaller LB than before
+        var scale = Math.min(0.17 * this.canvasHeight, Math.min(160, 0.24 * this.canvasWidth)) * 0.005;
+        this.lbCanvas.width = 220 * scale;
         this.lbCanvas.height = boardLength * scale;
         ctx.scale(scale, scale);
         ctx.globalAlpha = 0.4;
         ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, 250, boardLength);
+        ctx.fillRect(0, 0, 220, boardLength);
         ctx.globalAlpha = 1;
         ctx.fillStyle = "#FFFFFF";
-        ctx.font = canvasFont(30);
+        ctx.font = canvasFont(26);
         ctx.textAlign = "center";
-        ctx.fillText("Leaderboard", 125, 40);
+        ctx.fillText("Leaderboard", 110, 36);
         ctx.textAlign = "left";
-        ctx.font = canvasFont(18);
+        ctx.font = canvasFont(16);
         for (var i = 0; i < visible.length; i++) {
             var entry = visible[i];
             var name = entry.name || "An unnamed cell";
@@ -1814,23 +1878,23 @@ setSpect() {
             if (isMe && this.playerCells[0]?.name) {
                 name = this.playerCells[0].name;
             }
-            var y = 72 + 32 * i;
+            var y = 64 + 28 * i;
             var rankNum = (isMe && myRank > 10 && i === visible.length - 1) ? myRank : (i + 1);
             var rankLabel = (!this.noRanking ? rankNum + ". " : "");
             ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
             ctx.fillText(rankLabel, 8, y);
 
             var level = this.lbEntryLevel(entry, isMe);
-            var nameX = 8 + ctx.measureText(rankLabel).width + 4;
+            var nameX = 8 + ctx.measureText(rankLabel).width + 3;
             if (level != null && level >= 0) {
-                var cx = nameX + 15;
-                var cy = y - 6;
-                this.drawLevelStar(ctx, cx, cy, level, 15);
-                nameX += 36;
+                var cx = nameX + 12;
+                var cy = y - 5;
+                this.drawLevelStar(ctx, cx, cy, level, 12);
+                nameX += 30;
             }
-            ctx.font = canvasFont(18);
+            ctx.font = canvasFont(16);
             ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
-            var maxW = 240 - nameX;
+            var maxW = 210 - nameX;
             while (name.length > 1 && ctx.measureText(name).width > maxW) {
                 name = name.slice(0, -1);
             }

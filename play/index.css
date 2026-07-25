@@ -69,6 +69,58 @@ body {
     z-index: 1;
 }
 
+/* PC minimap (bottom-right) — like agar.su client */
+#map {
+    display: none;
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 35;
+    width: 150px;
+    height: 150px;
+    padding: 5px;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 18px;
+    background: rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+#map.is-visible {
+    display: block;
+}
+@media (max-width: 767px) {
+    #map { display: none !important; }
+}
+.map-container {
+    width: 140px;
+    height: 140px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    place-items: center;
+    position: relative;
+    overflow: hidden;
+}
+.map-container > div {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.55);
+    font-family: Ubuntu, "Segoe UI", sans-serif;
+    line-height: 1;
+}
+#mapposition {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 10px;
+    height: 10px;
+    margin: 0;
+    background: #1a73e8;
+    border-radius: 50%;
+    will-change: transform;
+    pointer-events: none;
+    z-index: 2;
+}
+
 #chat_textbox {
     transition: all .5s ease-in-out;
     position: absolute;
