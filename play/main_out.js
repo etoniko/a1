@@ -966,7 +966,6 @@ setSpect() {
         this.showMenuBackground = false;
         document.querySelector("#overlays").classList.remove("overlays-visible");
         this.updateBackgroundVisibility();
-        if (this.leaderBoard.length) this.drawLeaderBoard();
     }
     showOverlays(clearNick) {
         this.hasOverlay = true;
@@ -975,7 +974,6 @@ setSpect() {
         }
         document.querySelector("#overlays").classList.add("overlays-visible");
         this.updateBackgroundVisibility();
-        this.setGameLeaderboardVisible(false);
     }
     hideDisconnected() {
         this.disconnectedVisible = false;
@@ -1502,7 +1500,7 @@ setSpect() {
         this.ctx.restore();
         this.drawSplitIcon(this.ctx);
         this.drawTouch(this.ctx);
-        // Leaderboard is DOM (#gameLeaderboard), not canvas
+        this.lbCanvas && this.lbCanvas.width && this.ctx.drawImage(this.lbCanvas, this.canvasWidth - this.lbCanvas.width - 10, 10);
         if (this.chatCanvas != null) this.ctx.drawImage(this.chatCanvas, 0, this.canvasHeight - this.chatCanvas.height - 50);
         this.userScore = Math.max(this.userScore, this.calcUserScore());
         let displayText = '';
@@ -1633,82 +1631,61 @@ setSpect() {
             yCursor -= 4;
         }
     }
-    lbEsc(s) {
-        return String(s).replace(/[&<>"']/g, (c) => ({
-            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-        }[c]));
-    }
-    lbLevelTier(level) {
-        if (level >= 200) return "t4";
-        if (level >= 150) return "t3";
-        if (level >= 100) return "t2";
-        if (level >= 50) return "t1";
-        return "t0";
-    }
-    lbLevelHtml(level) {
-        if (level == null || level < 0) {
-            return '<span class="glb-lvl is-empty" aria-hidden="true">0</span>';
-        }
-        return '<span class="glb-lvl ' + this.lbLevelTier(level) + '" title="Уровень ' + level + '">' +
-            '<span class="dot"></span>' + level + "</span>";
-    }
-    setGameLeaderboardVisible(show) {
-        const panel = document.getElementById("gameLeaderboard");
-        if (!panel) return;
-        panel.classList.toggle("is-visible", !!show);
-        panel.setAttribute("aria-hidden", show ? "false" : "true");
-    }
     drawLeaderBoard() {
         this.lbCanvas = null;
-        const list = document.getElementById("toplistnow");
-        const panel = document.getElementById("gameLeaderboard");
-        if (!list || !panel) return;
-
-        if (!this.leaderBoard.length || this.hasOverlay) {
-            list.innerHTML = "";
-            this.setGameLeaderboardVisible(false);
-            return;
-        }
-
-        let myRank = null;
-        for (let i = 0; i < this.leaderBoard.length; i++) {
+        if (this.leaderBoard.length === 0) return;
+        this.lbCanvas = document.createElement("canvas");
+        var ctx = this.lbCanvas.getContext("2d");
+        var boardLength = 60;
+        var myRank = null;
+        for (var i = 0; i < this.leaderBoard.length; i++) {
             if (this.playerCells.some(cell => cell.id === this.leaderBoard[i].id)) {
                 myRank = i + 1;
                 break;
             }
         }
-
-        const rows = [];
-        const top = Math.min(10, this.leaderBoard.length);
-        for (let i = 0; i < top; i++) {
-            const entry = this.leaderBoard[i];
-            let name = entry.name || "An unnamed cell";
-            if (!this.showName) name = "An unnamed cell";
-            const isMe = this.playerCells.some(cell => cell.id === entry.id);
-            if (isMe && this.playerCells[0]?.name) name = this.playerCells[0].name;
-            const rank = this.noRanking ? "" : (i + 1) + ".";
-            rows.push(
-                '<div class="glb-row' + (isMe ? " is-me" : "") + '">' +
-                '<span class="glb-rank">' + rank + "</span>" +
-                this.lbLevelHtml(entry.level) +
-                '<span class="glb-name">' + this.lbEsc(name) + "</span></div>"
-            );
-        }
-
+        var visible = this.leaderBoard.slice(0, 10);
         if (myRank && myRank > 10) {
-            const me = this.leaderBoard[myRank - 1];
-            const name = this.playerCells[0]?.name || me?.name || "An unnamed cell";
-            rows.push(
-                '<div class="glb-row is-me">' +
-                '<span class="glb-rank">' + myRank + ".</span>" +
-                this.lbLevelHtml(me?.level) +
-                '<span class="glb-name">' + this.lbEsc(name) + "</span></div>"
-            );
+            var myEntry = this.leaderBoard[myRank - 1];
+            visible.push({
+                name: this.playerCells[0]?.name,
+                id: this.playerCells[0]?.id ?? 0,
+                level: myEntry?.level ?? -1,
+                xp: myEntry?.xp ?? 0
+            });
         }
-
-        list.innerHTML = rows.join("");
-        this.setGameLeaderboardVisible(true);
-
+        boardLength += 24 * visible.length;
+        var scale = Math.min(0.22 * this.canvasHeight, Math.min(200, 0.3 * this.canvasWidth)) * 0.005;
+        this.lbCanvas.width = 200 * scale;
+        this.lbCanvas.height = boardLength * scale;
+        ctx.scale(scale, scale);
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, 200, boardLength);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = canvasFont(30);
+        ctx.textAlign = "center";
+        ctx.fillText("Leaderboard", 100, 40);
+        ctx.textAlign = "left";
+        ctx.font = canvasFont(20);
+        for (var i = 0; i < visible.length; i++) {
+            var entry = visible[i];
+            var name = entry.name || "An unnamed cell";
+            if (!this.showName) name = "An unnamed cell";
+            var isMe = this.playerCells.some(cell => cell.id === entry.id);
+            if (isMe && this.playerCells[0]?.name) {
+                name = this.playerCells[0].name;
+            }
+            ctx.fillStyle = isMe ? "#FFAAAA" : "#FFFFFF";
+            var text = (!this.noRanking ? (i + 1) + ". " : "") + name;
+            if (isMe && myRank > 10 && i === visible.length - 1) {
+                text = myRank + ". " + name;
+            }
+            var w = ctx.measureText(text).width;
+            var x = (w > 190) ? 5 : 100 - w / 2;
+            ctx.fillText(text, x, 70 + 24 * i);
+        }
         if (window.AgarCabinet && document.getElementById("cabinet")?.classList.contains("is-open")) {
             window.AgarCabinet.refresh();
         }
