@@ -1,8 +1,8 @@
 /**
- * Авто-вход в игру через 1.5 с:
+ * Блокировка Play на 1.5 с (серая кнопка + цифры):
  * - при загрузке меню
  * - после смерти
- * Клик Play без ожидания — сразу спавн (если кнопка не в локе).
+ * После отсчёта блок снимается — вход только по клику Play.
  */
 (function () {
     "use strict";
@@ -11,7 +11,7 @@
     var DEFAULT_LABEL = "Play";
     var timerId = null;
     var lockedUntil = 0;
-    var autoStarted = false;
+    var startedOnLoad = false;
 
     function playBtn() {
         return document.getElementById("play");
@@ -76,16 +76,15 @@
         }, 50);
     }
 
-    /** После смерти / при входе: 1.5 с и авто-спавн */
-    function scheduleAutoPlay() {
-        runCountdown(LOCK_MS, doSpawn);
+    /** 1.5 с блок, потом просто разблокировать Play */
+    function lockThenUnlock() {
+        runCountdown(LOCK_MS, unlockIdle);
     }
 
     function onPlayClick() {
         var btn = playBtn();
         if (!btn) return false;
 
-        // Во время отсчёта клик игнорируем — ждём авто-вход
         if (btn.disabled || Date.now() < lockedUntil) {
             return false;
         }
@@ -94,16 +93,15 @@
         return false;
     }
 
-    function tryStartOnLoad() {
-        if (autoStarted) return;
-        if (typeof window.setNick !== "function") return;
-        autoStarted = true;
-        scheduleAutoPlay();
+    function tryLockOnLoad() {
+        if (startedOnLoad) return;
+        startedOnLoad = true;
+        lockThenUnlock();
     }
 
     window.AgarPlayGate = {
-        lockAfterDeath: scheduleAutoPlay,
-        scheduleAutoPlay: scheduleAutoPlay,
+        lockAfterDeath: lockThenUnlock,
+        lockThenUnlock: lockThenUnlock,
         onPlayClick: onPlayClick,
         LOCK_MS: LOCK_MS,
     };
@@ -121,12 +119,6 @@
             onPlayClick();
         });
 
-        // setNick появляется после инициализации game — подождём
-        var tries = 0;
-        var wait = setInterval(function () {
-            tries++;
-            tryStartOnLoad();
-            if (autoStarted || tries > 100) clearInterval(wait);
-        }, 50);
+        tryLockOnLoad();
     });
 })();
