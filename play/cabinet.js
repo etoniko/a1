@@ -47,6 +47,8 @@
     const TOKEN_KEY = "accountToken";
     const VK_APP = 54069355;
     const VK_REDIRECT = "https://agar.su";
+    const VK_VERIFIER_KEY = "vk_code_verifier";
+    const VK_STATE_KEY = "vk_state";
 
     function getAccountToken() {
         try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
@@ -56,6 +58,42 @@
             if (token) localStorage.setItem(TOKEN_KEY, token);
             else localStorage.removeItem(TOKEN_KEY);
         } catch (e) { /* ignore */ }
+    }
+
+    function vkRandom(len) {
+        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
+        const bytes = new Uint8Array(len);
+        crypto.getRandomValues(bytes);
+        let out = "";
+        for (let i = 0; i < len; i++) out += chars[bytes[i] % chars.length];
+        return out;
+    }
+    function persistPkce(codeVerifier, stateVal) {
+        try {
+            sessionStorage.setItem(VK_VERIFIER_KEY, codeVerifier);
+            sessionStorage.setItem(VK_STATE_KEY, stateVal);
+        } catch (e) { /* ignore */ }
+        try {
+            localStorage.setItem(VK_VERIFIER_KEY, codeVerifier);
+            localStorage.setItem(VK_STATE_KEY, stateVal);
+        } catch (e) { /* ignore */ }
+    }
+    function readPkce() {
+        const read = (fn) => { try { return fn(); } catch (e) { return null; } };
+        return {
+            codeVerifier:
+                read(() => sessionStorage.getItem(VK_VERIFIER_KEY)) ||
+                read(() => localStorage.getItem(VK_VERIFIER_KEY)),
+            state:
+                read(() => sessionStorage.getItem(VK_STATE_KEY)) ||
+                read(() => localStorage.getItem(VK_STATE_KEY))
+        };
+    }
+    function clearPkce() {
+        [VK_VERIFIER_KEY, VK_STATE_KEY].forEach((key) => {
+            try { sessionStorage.removeItem(key); } catch (e) { /* ignore */ }
+            try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+        });
     }
 
     const el = {
@@ -260,9 +298,13 @@
         state.accountName = null;
         state.accountAvatar = null;
         state.uid = null;
+        state.vkReady = false;
         updateXpUi(state.xp);
         updateAuthUi();
-        initVkAuth(true);
+        // Widget re-inits when cabinet is open on profile
+        if (el.root && el.root.classList.contains("is-open")) {
+            ensureVkWidget(true);
+        }
     }
 
     async function completeVkLogin(payload) {
@@ -270,96 +312,149 @@
             alert("VK: не получен код авторизации");
             return;
         }
+        const pkce = readPkce();
+        const body = {
+            code: payload.code,
+            device_id: payload.device_id,
+            code_verifier: payload.code_verifier || pkce.codeVerifier,
+            state: payload.state || pkce.state
+        };
+        if (!body.code_verifier || !body.state) {
+            alert("VK: сессия истекла, обновите страницу");
+            return;
+        }
+        clearPkce();
         try {
             const res = await fetch("https://api.agar.su/api/auth/vk", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(body)
             });
             const data = await res.json();
             if (data.error || !data.token) {
                 alert(data.error || "Ошибка авторизации");
+                ensureVkWidget(true);
                 return;
             }
             setAccountToken(data.token);
+            state.vkReady = false;
             await loadAccountProfile();
             openCabinet("profile");
         } catch (e) {
             alert("Ошибка сети при авторизации");
+            ensureVkWidget(true);
         }
     }
 
-    function initVkAuth(force) {
-        if (!("VKIDSDK" in window)) return;
-        const container = document.getElementById("VkIdSdkOAuthList");
-        if (!container) return;
-        if (getAccountToken() && !force) {
+    function handleVkUrlCallback() {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+        const deviceId = params.get("device_id");
+        if (!code || !deviceId) return false;
+        const pkce = readPkce();
+        if (!pkce.codeVerifier || !pkce.state) {
+            alert("VK: обновите страницу и войдите снова");
+            return false;
+        }
+        completeVkLogin({
+            code,
+            device_id: deviceId,
+            code_verifier: pkce.codeVerifier,
+            state: pkce.state
+        });
+        window.history.replaceState({}, "", window.location.pathname + window.location.hash);
+        return true;
+    }
+
+    function ensureVkWidget(force) {
+        if (getAccountToken()) {
             updateAuthUi();
             return;
         }
+        if (!("VKIDSDK" in window)) {
+            const box = document.getElementById("VkIdSdkOneTap");
+            if (box && !box.dataset.waitSdk) {
+                box.dataset.waitSdk = "1";
+                box.innerHTML = '<p class="cab-auth-hint" style="margin:0">Загрузка входа…</p>';
+                waitForVkSdk().then(() => ensureVkWidget(true));
+            }
+            return;
+        }
+        // Must be visible — VK ID breaks inside display:none
+        if (!el.root || !el.root.classList.contains("is-open")) return;
+        if (state.tab !== "profile") return;
+        if (el.authGuest && el.authGuest.hidden) return;
         if (state.vkReady && !force) return;
 
-        const params = new URLSearchParams(window.location.search);
-        if (params.get("code") && params.get("device_id")) {
-            const cv = sessionStorage.getItem("vk_code_verifier");
-            const st = sessionStorage.getItem("vk_state");
-            if (cv && st) {
-                completeVkLogin({
-                    code: params.get("code"),
-                    device_id: params.get("device_id"),
-                    code_verifier: cv,
-                    state: st
-                });
-            }
-            window.history.replaceState({}, "", window.location.pathname + window.location.hash);
-        }
-
-        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
-        const rnd = (n) => {
-            const b = new Uint8Array(n);
-            crypto.getRandomValues(b);
-            let s = "";
-            for (let i = 0; i < n; i++) s += chars[b[i] % chars.length];
-            return s;
-        };
-        const codeVerifier = rnd(64);
-        const stateStr = rnd(32);
-        sessionStorage.setItem("vk_code_verifier", codeVerifier);
-        sessionStorage.setItem("vk_state", stateStr);
+        const container = document.getElementById("VkIdSdkOneTap");
+        if (!container) return;
 
         const VKID = window.VKIDSDK;
+        const codeVerifier = vkRandom(64);
+        const stateVal = vkRandom(32);
+        persistPkce(codeVerifier, stateVal);
+
         try {
             VKID.Config.init({
                 app: VK_APP,
                 redirectUrl: VK_REDIRECT,
-                state: stateStr,
+                state: stateVal,
                 codeVerifier,
                 responseMode: VKID.ConfigResponseMode.Callback,
                 source: VKID.ConfigSource.LOWCODE,
                 scope: ""
             });
             container.innerHTML = "";
-            const oauthList = [VKID.OAuthName.VK, VKID.OAuthName.MAIL, VKID.OAuthName.OK];
-            new VKID.OAuthList().render({
+            // Same widget as https://agar.su/account/ — OneTap + OK/Mail
+            new VKID.OneTap().render({
                 container,
-                oauthList,
+                showAlternativeLogin: true,
+                oauthList: ["mail_ru", "ok_ru"],
+                styles: { width: 320, height: 44, borderRadius: 10 },
+                skin: VKID.OneTapSkin.Primary,
                 scheme: VKID.Scheme.LIGHT,
-                lang: VKID.Languages.RUS,
-                styles: { height: 44, borderRadius: 10 }
+                lang: VKID.Languages.RUS
             }).on(VKID.WidgetEvents.ERROR, (err) => {
                 console.error("VK ID error", err);
-            }).on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, (payload) => {
+                const msg = err && (err.error_description || err.error || err.text);
+                if (msg) alert("VK: " + msg);
+            }).on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, (payload) => {
                 completeVkLogin({
                     code: payload.code,
                     device_id: payload.device_id,
                     code_verifier: codeVerifier,
-                    state: stateStr
+                    state: stateVal
                 });
             });
             state.vkReady = true;
         } catch (e) {
             console.error("VK ID init failed", e);
+            container.innerHTML = '<p class="cab-auth-hint" style="margin:0;color:#d64545">Не удалось загрузить вход VK</p>';
+            state.vkReady = false;
         }
+    }
+
+    function waitForVkSdk() {
+        return new Promise((resolve) => {
+            if (window.VKIDSDK) return resolve(true);
+            let tries = 0;
+            const t = setInterval(() => {
+                tries++;
+                if (window.VKIDSDK || tries > 40) {
+                    clearInterval(t);
+                    resolve(!!window.VKIDSDK);
+                }
+            }, 150);
+            document.querySelector('script[src*="vkid"]')?.addEventListener("load", () => {
+                clearInterval(t);
+                resolve(!!window.VKIDSDK);
+            });
+        });
+    }
+
+    // legacy name used by logout / old calls
+    function initVkAuth(force) {
+        ensureVkWidget(force);
     }
 
     async function renderRating() {
@@ -618,10 +713,13 @@
     function openCabinet(tab) {
         if (!el.root) return;
         if (tab === "leaderboard" || tab === "donate") tab = tab === "donate" ? "shop" : "rating";
-        if (tab) setTab(tab);
-        refreshAll();
         el.root.classList.add("is-open");
         el.root.setAttribute("aria-hidden", "false");
+        if (tab) setTab(tab);
+        else if (!state.tab) setTab("profile");
+        refreshAll();
+        // VK widget only after panel is visible (display:none breaks OneTap)
+        requestAnimationFrame(() => ensureVkWidget(false));
     }
     function closeCabinet() {
         if (!el.root) return;
@@ -639,6 +737,7 @@
         if (tab === "skins") renderSkins();
         if (tab === "rating") renderRating();
         if (tab === "shop") calculateShop();
+        if (tab === "profile") requestAnimationFrame(() => ensureVkWidget(false));
     }
 
     function refreshAll() {
@@ -765,9 +864,7 @@
         bindNickSkin();
         ensureSkinMap();
         window.onVkAuth = completeVkLogin;
-        const bootVk = () => initVkAuth(false);
-        if ("VKIDSDK" in window) bootVk();
-        else document.querySelector('script[src*="@vkid/sdk"]')?.addEventListener("load", bootVk);
+        handleVkUrlCallback();
         loadAccountProfile();
         updateXpUi(0);
         setTab("profile");

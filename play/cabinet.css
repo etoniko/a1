@@ -204,10 +204,15 @@
     margin: 0 0 12px;
 }
 #vkAuthContainer,
-#VkIdSdkOAuthList {
+#VkIdSdkOneTap {
     display: flex;
     justify-content: center;
+    width: 100%;
     min-height: 48px;
+}
+#VkIdSdkOneTap > * {
+    width: 100% !important;
+    max-width: 360px;
 }
 .cab-auth-user {
     display: flex;
