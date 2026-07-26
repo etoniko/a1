@@ -223,7 +223,6 @@
         state._skinMapPromise = (async () => {
             const map = Object.create(null);
             const g = window.game;
-            // Prefer already-loaded game map — avoid reparsing huge skinlist on profile open
             if (g && g.skinMap && Object.keys(g.skinMap).length) {
                 Object.keys(g.skinMap).forEach((k) => { map[k] = g.skinMap[k]; });
                 state.skinMap = map;
@@ -233,7 +232,6 @@
             try {
                 const res = await fetch(SKINLIST_URL, { cache: "force-cache" });
                 const text = await res.text();
-                // Yield so game rAF can breathe before heavy parse
                 await new Promise((r) => setTimeout(r, 0));
                 const lines = text.split(/\r?\n/);
                 const entries = [];
@@ -337,7 +335,6 @@
             el.avatar.style.backgroundImage = "url('" + state.accountAvatar.replace(/'/g, "%27") + "')";
         }
         updateAuthUi();
-        // Skin preview is expensive (skinlist); only when nick/avatar identity may have changed
         const previewKey = displayName + "|" + (state.accountAvatar || "");
         if (state._previewKey !== previewKey) {
             state._previewKey = previewKey;
@@ -482,7 +479,6 @@
             }
             return;
         }
-        // Must be visible — VK ID breaks inside display:none
         if (!el.root || !el.root.classList.contains("is-open")) return;
         if (state.tab !== "profile") return;
         if (el.authGuest && el.authGuest.hidden) return;
@@ -507,7 +503,6 @@
                 scope: ""
             });
             container.innerHTML = "";
-            // Same widget as https://agar.su/account/ — OneTap + OK/Mail
             new VKID.OneTap().render({
                 container,
                 showAlternativeLogin: true,
@@ -554,7 +549,6 @@
         });
     }
 
-    // legacy name used by logout / old calls
     function initVkAuth(force) {
         ensureVkWidget(force);
     }
@@ -844,7 +838,6 @@
         state._nickLoading = true;
         renderInventory();
         try {
-            // Fetch nicknames first (small); perk/skin lists can wait
             const res = await fetch("https://api.agar.su/api/me/nicknames", {
                 headers: { Authorization: "Game " + getAccountToken() },
                 cache: "no-store"
@@ -859,7 +852,6 @@
             if (!res.ok) throw new Error("nicknames " + res.status);
             const data = await res.json();
             state.nicknames = Array.isArray(data?.nicknames) ? data.nicknames : [];
-            // Load perk/skin maps in background, then re-render badges once
             renderInventory();
             Promise.all([ensureSkinMap(), ensurePerkLists()]).then(() => {
                 if (el.root?.classList.contains("is-open") && state.tab === "profile") {
@@ -913,6 +905,74 @@
         const clan = document.querySelector('input[name="cabServiceType"][value="clan"]');
         return clan && clan.checked ? 2 : 1;
     }
+
+    /**
+     * Обрабатывает загруженный файл: если это PNG или GIF — оставляет как есть.
+     * Если это JPEG/JPG — обрезает в круг и конвертирует в PNG размером 512x512.
+     * Возвращает Promise с File или Blob для отправки.
+     */
+    function processSkinFile(file) {
+        return new Promise((resolve, reject) => {
+            if (!file) return reject(new Error("Файл не выбран"));
+            
+            const type = file.type;
+            // Если PNG или GIF — пропускаем без изменений
+            if (type === "image/png" || type === "image/gif") {
+                return resolve(file);
+            }
+            
+            // Для JPEG/JPG — обрабатываем
+            if (type === "image/jpeg" || type === "image/jpg") {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        // Создаем canvas 512x512
+                        const canvas = document.createElement("canvas");
+                        canvas.width = 512;
+                        canvas.height = 512;
+                        const ctx = canvas.getContext("2d");
+                        
+                        // Рисуем круг
+                        ctx.beginPath();
+                        ctx.arc(256, 256, 256, 0, Math.PI * 2);
+                        ctx.closePath();
+                        ctx.clip();
+                        
+                        // Масштабируем изображение, чтобы заполнить круг
+                        const scale = Math.max(512 / img.width, 512 / img.height);
+                        const x = (512 - img.width * scale) / 2;
+                        const y = (512 - img.height * scale) / 2;
+                        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                        
+                        // Конвертируем в PNG
+                        canvas.toBlob(function(blob) {
+                            if (!blob) return reject(new Error("Не удалось конвертировать изображение"));
+                            // Создаем новый File с расширением .png
+                            const fileName = file.name.replace(/\.[^.]+$/, "") + ".png";
+                            const processedFile = new File([blob], fileName, {
+                                type: "image/png",
+                                lastModified: Date.now()
+                            });
+                            resolve(processedFile);
+                        }, "image/png");
+                    };
+                    img.onerror = function() {
+                        reject(new Error("Не удалось загрузить изображение"));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.onerror = function() {
+                    reject(new Error("Ошибка чтения файла"));
+                };
+                reader.readAsDataURL(file);
+            } else {
+                // Другие форматы не поддерживаются
+                reject(new Error("Поддерживаются только PNG, GIF и JPG/JPEG"));
+            }
+        });
+    }
+
     function calculateShop() {
         const s = shopEls();
         if (!s.buy) return;
@@ -924,7 +984,15 @@
         const invisibleCost = s.inv.checked ? 500 : 0;
         const rotationCost = s.rot.checked ? 500 : 0;
         let skinCost = 0;
-        if (file) skinCost = file.type === "image/gif" ? 4500 : 150;
+        if (file) {
+            // PNG и GIF — стандартная цена, JPG/JPEG — обрабатываем как PNG
+            const type = file.type;
+            if (type === "image/gif") {
+                skinCost = 4500;
+            } else if (type === "image/png" || type === "image/jpeg" || type === "image/jpg") {
+                skinCost = 150;
+            }
+        }
         const total = (passwordCost + skinCost + invisibleCost + rotationCost) * mult;
         s.mult.textContent = mult === 2 ? "2×" : "1×";
         s.passCost.textContent = (passwordCost * mult) + " ₽";
@@ -935,37 +1003,46 @@
         const hasItem = !!(pass || file || s.inv.checked || s.rot.checked);
         s.buy.disabled = !(nick && hasItem && total > 0);
     }
+
     function previewShopFile(file) {
         const s = shopEls();
         if (!file || !s.preview) return;
-        const url = URL.createObjectURL(file);
-        const isGif = file.type === "image/gif";
-        if (isGif) {
-            s.canvas.style.display = "none";
-            s.gif.style.display = "block";
-            s.gif.src = url;
-        } else {
-            s.gif.style.display = "none";
-            s.canvas.style.display = "block";
-            const ctx = s.canvas.getContext("2d");
-            const img = new Image();
-            img.onload = () => {
-                ctx.clearRect(0, 0, 256, 256);
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(128, 128, 128, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.clip();
-                const scale = Math.max(256 / img.width, 256 / img.height);
-                const x = (256 - img.width * scale) / 2;
-                const y = (256 - img.height * scale) / 2;
-                ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-                ctx.restore();
-            };
-            img.src = url;
-        }
-        s.preview.classList.add("has-image");
+        
+        // Обрабатываем файл для превью
+        processSkinFile(file).then(processedFile => {
+            const url = URL.createObjectURL(processedFile);
+            const isGif = processedFile.type === "image/gif";
+            if (isGif) {
+                s.canvas.style.display = "none";
+                s.gif.style.display = "block";
+                s.gif.src = url;
+            } else {
+                s.gif.style.display = "none";
+                s.canvas.style.display = "block";
+                const ctx = s.canvas.getContext("2d");
+                const img = new Image();
+                img.onload = () => {
+                    ctx.clearRect(0, 0, 256, 256);
+                    // Если это PNG — рисуем в круг
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(128, 128, 128, 0, Math.PI * 2);
+                    ctx.closePath();
+                    ctx.clip();
+                    const scale = Math.max(256 / img.width, 256 / img.height);
+                    const x = (256 - img.width * scale) / 2;
+                    const y = (256 - img.height * scale) / 2;
+                    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                    ctx.restore();
+                };
+                img.src = url;
+            }
+            s.preview.classList.add("has-image");
+        }).catch(err => {
+            shopMsg("Ошибка обработки: " + err.message);
+        });
     }
+
     async function submitShop(e) {
         e.preventDefault();
         const s = shopEls();
@@ -973,6 +1050,7 @@
         const password = (s.pass.value || "").trim().toLowerCase();
         const file = s.file.files && s.file.files[0];
         const serviceType = (document.querySelector('input[name="cabServiceType"]:checked') || {}).value || "personal";
+        
         if (!nickname) {
             shopMsg("Введите ник.");
             return;
@@ -985,9 +1063,31 @@
             shopMsg("Файл слишком большой (макс. 5MB).");
             return;
         }
+        if (file) {
+            const type = file.type;
+            if (!["image/png", "image/gif", "image/jpeg", "image/jpg"].includes(type)) {
+                shopMsg("Только PNG, GIF, JPG/JPEG.");
+                return;
+            }
+        }
+
+        // Обрабатываем файл перед отправкой
+        let processedFile = file;
+        if (file && (file.type === "image/jpeg" || file.type === "image/jpg")) {
+            try {
+                processedFile = await processSkinFile(file);
+            } catch (err) {
+                shopMsg("Ошибка обработки: " + err.message);
+                return;
+            }
+        }
+
         const mult = shopMultiplier();
         const passwordCost = password ? 1 : 0;
-        const skinCost = file ? (file.type === "image/gif" ? 2 : 1) : 0;
+        let skinCost = 0;
+        if (processedFile) {
+            skinCost = processedFile.type === "image/gif" ? 2 : 1;
+        }
         const amount = (passwordCost + skinCost) * mult;
         const formData = new FormData();
         formData.append("name", nickname);
@@ -996,7 +1096,9 @@
         if (password) formData.append("password", password);
         if (s.inv.checked) formData.append("invisible", "1");
         if (s.rot.checked) formData.append("rotation", "1");
-        if (file) formData.append("image", file, file.name);
+        if (processedFile) {
+            formData.append("image", processedFile, processedFile.name);
+        }
 
         const headers = {};
         const token = getAccountToken();
@@ -1030,6 +1132,7 @@
         }
         calculateShop();
     }
+
     function bindShop() {
         const s = shopEls();
         if (!s.form) return;
@@ -1056,9 +1159,10 @@
                 shopMsg("Файл слишком большой (макс. 5MB).");
                 return;
             }
-            if (!["image/png", "image/jpeg", "image/gif"].includes(file.type)) {
+            const type = file.type;
+            if (!["image/png", "image/gif", "image/jpeg", "image/jpg"].includes(type)) {
                 s.file.value = "";
-                shopMsg("Только PNG, JPG, GIF.");
+                shopMsg("Только PNG, GIF, JPG/JPEG.");
                 return;
             }
             shopMsg("");
@@ -1098,14 +1202,12 @@
         if (tab === "shop") calculateShop();
         if (tab === "profile") {
             requestAnimationFrame(() => ensureVkWidget(false));
-            // Defer inventory work so open animation / game loop stay smooth
             setTimeout(() => loadMyNicknames(false), 0);
         }
     }
 
     function refreshAll() {
         updateXpUi(state.xp);
-        // Never rebuild heavy tabs from game tick — only light XP/auth
     }
 
     function bindOpeners() {
@@ -1131,7 +1233,6 @@
                 });
             });
         });
-        // Skin circle near nick: preview only; click opens played skins
         const skinBtn = document.getElementById("skinButton");
         if (skinBtn) {
             skinBtn.addEventListener("click", (e) => {
@@ -1157,7 +1258,6 @@
                 rememberPlayedNick(nickInput.value);
             });
         }
-        // Wrap setNick if available later
         const wrapSetNick = () => {
             if (!window.game || typeof window.game.setNick !== "function" || window.game.setNick._cabWrapped) return;
             const orig = window.game.setNick.bind(window.game);
@@ -1228,7 +1328,6 @@
         bindShop();
         bindOpeners();
         bindNickSkin();
-        // Warm skin map idle — don't block first paint / game start
         const warmSkins = () => { ensureSkinMap().catch(() => {}); };
         if (typeof requestIdleCallback === "function") requestIdleCallback(warmSkins, { timeout: 4000 });
         else setTimeout(warmSkins, 1500);
