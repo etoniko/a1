@@ -549,6 +549,8 @@
     color: #9aa5b2;
     text-align: center;
     pointer-events: none;
+    display: flex;
+    justify-content: center;
 }
 .cab-shop-preview.has-image .hint { display: none; }
 .cab-shop-preview input[type="file"] {
