@@ -283,7 +283,7 @@ function initHelloDialogScale() {
 }
 
 const SERVERS = {
-    ffa: "ffa.agar.su:6013",
+    ffa: "ffa.agar.su",
     ffa2: "ffa.agar.su",
     experimental: "ffa.agar.su", // alias → Special / ffa2
     ms: "ffa.agar.su:6002",
