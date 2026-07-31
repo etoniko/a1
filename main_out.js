@@ -284,7 +284,7 @@ function initHelloDialogScale() {
 
 const SERVERS = {
     ffa: "ffa.agar.su",
-    ffa2: "ffa.agar.su",
+    ffa1: "sixz.ru/ffa1",
     experimental: "ffa.agar.su", // alias → Special / ffa2
     ms: "ffa.agar.su:6002",
     pvp1: "ffa.agar.su:6004",
