@@ -892,7 +892,13 @@
             skinCost: document.getElementById("cabSkinCost"),
             invCost: document.getElementById("cabInvCost"),
             rotCost: document.getElementById("cabRotCost"),
-            total: document.getElementById("cabTotal")
+            total: document.getElementById("cabTotal"),
+            overlay: document.getElementById("cabPayOverlay"),
+            backdrop: document.getElementById("cabPayBackdrop"),
+            email: document.getElementById("cabShopEmail"),
+            pay: document.getElementById("cabPayBtn"),
+            payClose: document.getElementById("cabPayClose"),
+            payAmount: document.getElementById("cabPayAmount")
         };
     }
     function shopMsg(text, ok) {
@@ -904,6 +910,58 @@
     function shopMultiplier() {
         const clan = document.querySelector('input[name="cabServiceType"][value="clan"]');
         return clan && clan.checked ? 2 : 1;
+    }
+
+    var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    var shopPayOpen = false;
+    var shopPaying = false;
+
+    function getShopEmail() {
+        const s = shopEls();
+        return ((s.email && s.email.value) || "").trim().toLowerCase();
+    }
+    function isShopEmailValid() {
+        return EMAIL_RE.test(getShopEmail());
+    }
+    function updateShopPayBtn() {
+        const s = shopEls();
+        if (!s.pay) return;
+        s.pay.disabled = shopPaying || !isShopEmailValid();
+        if (!shopPaying) s.pay.textContent = "Оплатить";
+    }
+    function openShopPay() {
+        const s = shopEls();
+        if (!s.overlay) return;
+        if (s.payAmount) s.payAmount.textContent = (s.total && s.total.textContent) || "0 ₽";
+        s.overlay.hidden = false;
+        s.overlay.setAttribute("aria-hidden", "false");
+        requestAnimationFrame(() => s.overlay.classList.add("is-open"));
+        shopPayOpen = true;
+        shopMsg("");
+        updateShopPayBtn();
+        setTimeout(() => s.email && s.email.focus(), 60);
+    }
+    function closeShopPay() {
+        const s = shopEls();
+        if (!s.overlay || shopPaying) return;
+        s.overlay.classList.remove("is-open");
+        s.overlay.setAttribute("aria-hidden", "true");
+        shopPayOpen = false;
+        const finish = () => {
+            if (!shopPayOpen) s.overlay.hidden = true;
+        };
+        s.overlay.addEventListener("transitionend", finish, { once: true });
+        setTimeout(finish, 240);
+    }
+    function trySubmitShopEmail() {
+        if (!shopPayOpen || shopPaying) return;
+        if (!isShopEmailValid()) {
+            if (getShopEmail()) shopMsg("Введите корректный email.");
+            else shopMsg("Укажите email для чека.");
+            return;
+        }
+        shopMsg("");
+        submitShopPayment();
     }
 
     /**
@@ -1043,14 +1101,11 @@
         });
     }
 
-    async function submitShop(e) {
-        e.preventDefault();
+    function openShopCheckout() {
         const s = shopEls();
-        const nickname = (s.nick.value || "").trim().toLowerCase();
-        const password = (s.pass.value || "").trim().toLowerCase();
+        const nickname = (s.nick.value || "").trim();
+        const password = (s.pass.value || "").trim();
         const file = s.file.files && s.file.files[0];
-        const serviceType = (document.querySelector('input[name="cabServiceType"]:checked') || {}).value || "personal";
-        
         if (!nickname) {
             shopMsg("Введите ник.");
             return;
@@ -1070,8 +1125,34 @@
                 return;
             }
         }
+        openShopPay();
+    }
 
-        // Обрабатываем файл перед отправкой
+    async function submitShopPayment() {
+        const s = shopEls();
+        if (shopPaying) return;
+        const nickname = (s.nick.value || "").trim().toLowerCase();
+        const password = (s.pass.value || "").trim().toLowerCase();
+        const email = getShopEmail();
+        const file = s.file.files && s.file.files[0];
+        const serviceType = (document.querySelector('input[name="cabServiceType"]:checked') || {}).value || "personal";
+
+        if (!nickname) {
+            shopMsg("Введите ник.");
+            closeShopPay();
+            return;
+        }
+        if (!isShopEmailValid()) {
+            shopMsg("Введите корректный email.");
+            s.email && s.email.focus();
+            return;
+        }
+        if (!password && !file && !s.inv.checked && !s.rot.checked) {
+            shopMsg("Выберите пароль, скин или дополнение.");
+            closeShopPay();
+            return;
+        }
+
         let processedFile = file;
         if (file && (file.type === "image/jpeg" || file.type === "image/jpg")) {
             try {
@@ -1093,6 +1174,7 @@
         formData.append("name", nickname);
         formData.append("amount", amount);
         formData.append("serviceType", serviceType);
+        formData.append("email", email);
         if (password) formData.append("password", password);
         if (s.inv.checked) formData.append("invisible", "1");
         if (s.rot.checked) formData.append("rotation", "1");
@@ -1104,7 +1186,10 @@
         const token = getAccountToken();
         if (token) headers.Authorization = "Game " + token;
 
-        s.buy.disabled = true;
+        shopPaying = true;
+        updateShopPayBtn();
+        if (s.pay) s.pay.textContent = "Оплата…";
+        if (s.buy) s.buy.disabled = true;
         shopMsg("Создаём платёж…", true);
         try {
             const res = await fetch("https://api.agar.su/create-payment", {
@@ -1115,7 +1200,6 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
                 shopMsg(data.error || data.message || ("Ошибка " + res.status));
-                calculateShop();
                 return;
             }
             const redirect = data.confirmation && data.confirmation.confirmation_url
@@ -1129,8 +1213,11 @@
             shopMsg(data.message || "Платёж создан.", true);
         } catch (err) {
             shopMsg("Сеть: не удалось создать платёж.");
+        } finally {
+            shopPaying = false;
+            updateShopPayBtn();
+            calculateShop();
         }
-        calculateShop();
     }
 
     function bindShop() {
@@ -1169,7 +1256,48 @@
             previewShopFile(file);
             calculateShop();
         });
-        s.form.addEventListener("submit", submitShop);
+        s.form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            if (s.buy && !s.buy.disabled) openShopCheckout();
+        });
+        if (s.buy) {
+            s.buy.addEventListener("click", () => {
+                if (!s.buy.disabled) openShopCheckout();
+            });
+        }
+        if (s.email) {
+            s.email.addEventListener("input", () => {
+                if (!getShopEmail() || isShopEmailValid()) shopMsg("");
+                updateShopPayBtn();
+            });
+            s.email.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    trySubmitShopEmail();
+                }
+            });
+            s.email.addEventListener("blur", () => {
+                if (shopPayOpen && isShopEmailValid()) trySubmitShopEmail();
+            });
+        }
+        if (s.payClose) {
+            s.payClose.addEventListener("mousedown", (e) => e.preventDefault());
+            s.payClose.addEventListener("click", closeShopPay);
+        }
+        if (s.backdrop) {
+            s.backdrop.addEventListener("click", () => {
+                if (shopPaying) return;
+                if (isShopEmailValid()) trySubmitShopEmail();
+                else closeShopPay();
+            });
+        }
+        if (s.pay) {
+            s.pay.addEventListener("mousedown", (e) => e.preventDefault());
+            s.pay.addEventListener("click", trySubmitShopEmail);
+        }
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && shopPayOpen && !shopPaying) closeShopPay();
+        });
         calculateShop();
     }
 

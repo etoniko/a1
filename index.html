@@ -39,7 +39,7 @@
     </script>
     <link rel="preload" href="https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf" as="font" type="font/ttf" crossorigin>
     <link href="./index.css?13" rel="stylesheet">
-    <link href="./cabinet.css?7" rel="stylesheet">
+    <link href="./cabinet.css?8" rel="stylesheet">
     <script src="./antimat.js?2"></script>
     <script src="./main_out.js?33"></script>
     <script src="https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js"></script>
@@ -633,14 +633,28 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <li><span>Поворот</span><strong id="cabRotCost">0 ₽</strong></li>
                             </ul>
                             <div class="cab-shop-total"><span>Итого</span><strong id="cabTotal">0 ₽</strong></div>
-                            <button type="submit" form="cabPaymentForm" class="cab-shop-buy" id="cabBuyBtn" disabled>Купить</button>
+                            <button type="button" class="cab-shop-buy" id="cabBuyBtn" disabled>Купить</button>
                         </aside>
+                        <div id="cabPayOverlay" class="cab-pay-overlay" hidden aria-hidden="true">
+                            <div class="cab-pay-backdrop" id="cabPayBackdrop"></div>
+                            <div class="cab-pay-card" role="dialog" aria-modal="true" aria-labelledby="cabPayTitle">
+                                <button type="button" id="cabPayClose" class="cab-pay-close" aria-label="Закрыть">&times;</button>
+                                <div class="cab-pay-title" id="cabPayTitle">
+                                    <span>Чек</span>
+                                    <strong id="cabPayAmount">0 ₽</strong>
+                                </div>
+                                <p class="cab-pay-hint">Перед переходом на оплату укажите вашу почту</p>
+                                <label class="cab-pay-label" for="cabShopEmail">Email для чека</label>
+                                <input type="email" id="cabShopEmail" class="cab-pay-email" placeholder="name@example.com" maxlength="120" autocomplete="email" inputmode="email">
+                                <button type="button" id="cabPayBtn" class="cab-pay-btn" disabled>Оплатить</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
         </div>
     </div>
 </div>
-<script src="./cabinet.js?10"></script>
+<script src="./cabinet.js?11"></script>
 </body>
 </html>
