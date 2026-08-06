@@ -284,10 +284,10 @@ function initHelloDialogScale() {
 
 const SERVERS = {
     ffa: "ffa.agar.su",
-    ffa1: "sixz.ru/ffa1",
-    ms: "sixz.ru/ms",
-    pvp1: "sixz.ru/pvp1",
-    tournament: "sixz.ru/tournament"
+    ffa1: "ffa.agar.su:6001",
+    ms: "ms.agar.su:6001",
+    pvp1: "ffa.agar.su:6004",
+    tournament: "ffa.agar.su:6002"
 };
 
 function resolveServerUrl(arg) {
