@@ -1,17 +1,54 @@
 <html>
 <head>
-     <title>Агарио</title>
-    <meta name="description" content="Агарио - шарики онлайн, лучшая Агарио игра в браузере. Никаких скачиваний, просто начните играть в Агарио прямо сейчас!">
-	<meta charset="utf-8">
+    <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="keywords" content="агарио, agario, agar, io, cell, cells, virus, bacteria, blob, game, games, web game, html5, fun, flash">
-    <meta name="robots" content="index, follow">
     <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- Основной SEO -->
+    <title>Агарио</title>
+    <meta name="description" content="Агарио.рф — лучшая версия Агарио онлайн. Играй в шарики прямо в браузере без скачивания. Быстрые сервера, красивые скины, вирусы и много игроков. Начни прямо сейчас!">
+    <meta name="keywords" content="агарио, агарио.рф, agario, agar.io, шарики онлайн, игра агарио, агарио играть, агарио без скачивания, cell, cells, virus, blob, io игры">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="author" content="Агарио.рф">
+    <meta name="theme-color" content="#1a1a2e">
+    
+    <!-- Canonical -->
+    <link rel="canonical" href="https://xn--80aaiv4ak.xn--p1ai/">
+    
+    <!-- Яндекс -->
+    <meta name="yandex-verification" content="d2648e3bc2d73129">
+    <meta name="yandex" content="index, follow">
+    
+    <!-- Open Graph (VK, Telegram, Facebook, WhatsApp и др.) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Агарио.рф">
+    <meta property="og:title" content="Агарио.рф — Играть в Агарио онлайн бесплатно">
+    <meta property="og:description" content="Лучшая Агарио онлайн. Шарики, вирусы, быстрые сервера. Играй прямо в браузере без скачивания!">
+    <meta property="og:url" content="https://xn--80aaiv4ak.xn--p1ai/">
+    <meta property="og:image" content="https://xn--80aaiv4ak.xn--p1ai/image.jpg">
+    <meta property="og:image:secure_url" content="https://xn--80aaiv4ak.xn--p1ai/image.jpg">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Агарио.рф — играть онлайн">
+    <meta property="og:locale" content="ru_RU">
+    
+    <!-- Twitter / X Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Агарио.рф — Играть в Агарио онлайн бесплатно">
+    <meta name="twitter:description" content="Лучшая Агарио онлайн. Шарики, вирусы, быстрые сервера. Играй прямо в браузере!">
+    <meta name="twitter:image" content="https://xn--80aaiv4ak.xn--p1ai/image.jpg">
+    <meta name="twitter:image:alt" content="Агарио.рф">
+    
+    <!-- Дополнительно для мобильных и Apple -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="yandex-verification" content="d2648e3bc2d73129" />
-	<link rel="canonical" href="https://xn--80aaiv4ak.xn--p1ai/">
-    <!-- Игре не нужны микрофон/камера — режем запросы от рекламы и сторонних SDK -->
+    <meta name="apple-mobile-web-app-title" content="Агарио.рф">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    
+    <!-- Permissions Policy (как было) -->
     <meta http-equiv="Permissions-Policy" content="microphone=(), camera=(), geolocation=(), display-capture=(), window-management=(), local-fonts=(), serial=(), usb=(), hid=(), bluetooth=()">
+    
     <script>
     (function () {
         function deny() {
@@ -37,18 +74,44 @@
         } catch (e) {}
     })();
     </script>
+    
+    <!-- Шрифт -->
     <link rel="preload" href="https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf" as="font" type="font/ttf" crossorigin>
+    
+    <!-- Стили и скрипты -->
     <link href="./index.css?13" rel="stylesheet">
     <link href="./cabinet.css?8" rel="stylesheet">
     <script src="./antimat.js?2"></script>
     <script src="./main_out.js?38"></script>
     <script src="https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js"></script>
+    
+    <!-- Favicon -->
     <link id="favicon" rel="icon" type="image/png" href="favicon.png">
-    <!-- Yandex.RTB: ID блоков задаются в rtb-ads.js (AGAR_RSYA) -->
+    <link rel="apple-touch-icon" href="favicon.png">
+    
+    <!-- Yandex.RTB -->
     <script>window.yaContextCb = window.yaContextCb || [];</script>
     <script src="https://yandex.ru/ads/system/context.js" async></script>
     <script src="./rtb-ads.js?4"></script>
     <script src="./play-gate.js?3"></script>
+    
+    <!-- JSON-LD для Google (Structured Data) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Агарио.рф",
+      "alternateName": ["Агарио", "Agar.io", "Agario"],
+      "url": "https://xn--80aaiv4ak.xn--p1ai/",
+      "description": "Лучшая версия Агарио онлайн — играй в шарики прямо в браузере без скачивания",
+      "inLanguage": "ru-RU",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://xn--80aaiv4ak.xn--p1ai/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
 </head>
 	<script>
 	(function () {
