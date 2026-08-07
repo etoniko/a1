@@ -1112,7 +1112,7 @@ setSpect() {
         this.clearGameState();
 
         const host = this.CONNECTION_URL;
-        const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + host; /1
+        const wsUrl = wsUrlArg || (this.useHttps ? "wss://" : "ws://") + host;
 
         let connectToken = null;
         try {
