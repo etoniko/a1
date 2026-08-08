@@ -1,6 +1,6 @@
 const serverPowSupportCache = new Map();
 
-const CANVAS_FONT_FAMILY = "Ubuntu";
+const CANVAS_FONT_FAMILY = "Ubuntu"; //
 let canvasFontReady = false;
 
 function canvasFont(sizePx) {
