@@ -82,7 +82,7 @@
     <link href="./index.css?13" rel="stylesheet">
     <link href="./cabinet.css?8" rel="stylesheet">
     <script src="./antimat.js?2"></script>
-    <script src="./main_out.js?21321421412"></script>
+    <script src="./main_out.js?76"></script>
     <script src="https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js"></script>
     
     <!-- Favicon -->
@@ -527,7 +527,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setCookie('userNick', '', -1);
     setCookie('userPass', '', -1);
 
-    fetch('https://api.agar.su/pass.txt')
+    fetch('https://agar.su/pass.txt')
         .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
         .then(data => {
             allowedNicks = data.split('\n')
@@ -607,7 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     <div class="cab-auth-user" id="cabAuthUser" hidden>
-                        <img id="cabAuthAvatar" src="https://api.agar.su/skins/4.png" alt="">
+                        <img id="cabAuthAvatar" src="https://agar.su/skins/4.png" alt="">
                         <div class="meta">
                             <div class="name" id="cabAuthName">—</div>
                             <div class="sub" id="cabAuthMeta">ID —</div>
