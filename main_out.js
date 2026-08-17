@@ -420,8 +420,8 @@ class Game {
         this.ejectPressed = false;
         this.splitIcon = new Image();
         this.ejectIcon = new Image();
-        this.splitIcon.src = "https://agar.su/assets/photo/split.png";
-        this.ejectIcon.src = "https://agar.su/assets/photo/eject.png";
+        this.splitIcon.src = "https://agar.su/photo/split.png";
+        this.ejectIcon.src = "https://agar.su/photo/eject.png";
         this.timestamp = 0;
         // Управление
         this.isTyping = false;
@@ -495,7 +495,7 @@ class Game {
 	
 	async loadSkinList() {
     try {
-        const res = await fetch("https://api.agar.su/skinlist.txt");
+        const res = await fetch("https://agar.su/skinlist.txt");
         const text = await res.text();
 
 text.split("\n").forEach(line => {
@@ -531,7 +531,7 @@ getSkinForNick(nick) {
     if (this.skinLoading[code]) return null;
 
     const img = new Image();
-    img.src = "https://api.agar.su/skins/" + code + ".png";
+    img.src = "https://agar.su/skins/" + code + ".png";
 
     this.skinLoading[code] = true;
 
