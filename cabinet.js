@@ -49,6 +49,8 @@
     }
 
     const TOKEN_KEY = "accountToken";
+    const SESSION_KEY = "accountSessionId";
+    const SESSION_TAKEOVER_KEY = "accountSessionTakeover";
     const VK_APP = 54069355;
     const VK_REDIRECT = "https://agar.su";
     const VK_VERIFIER_KEY = "vk_code_verifier";
@@ -63,6 +65,89 @@
             else localStorage.removeItem(TOKEN_KEY);
         } catch (e) { /* ignore */ }
     }
+    function getSessionId() {
+        try { return sessionStorage.getItem(SESSION_KEY) || ""; } catch (e) { return ""; }
+    }
+    function setSessionId(sid) {
+        try {
+            if (!sid) sessionStorage.removeItem(SESSION_KEY);
+            else sessionStorage.setItem(SESSION_KEY, sid);
+        } catch (e) { /* ignore */ }
+    }
+    let sessionEs = null;
+    let sessionKicked = false;
+    let sessionBC = null;
+    function authHeaders() {
+        const h = {};
+        const token = getAccountToken();
+        if (token) h.Authorization = "Game " + token;
+        const sid = getSessionId();
+        if (sid) h["X-Session-Id"] = sid;
+        return h;
+    }
+    function stopSessionEvents() {
+        try { if (sessionEs) sessionEs.close(); } catch (e) { /* ignore */ }
+        sessionEs = null;
+    }
+    function broadcastTakeover(sid) {
+        if (!sid) return;
+        try {
+            localStorage.setItem(SESSION_TAKEOVER_KEY, JSON.stringify({ sid: String(sid), t: Date.now() }));
+        } catch (e) { /* ignore */ }
+        try {
+            if (sessionBC) sessionBC.postMessage({ type: "takeover", sid: String(sid) });
+        } catch (e) { /* ignore */ }
+    }
+    function forceCabinetSessionKick(msg) {
+        if (sessionKicked) return;
+        sessionKicked = true;
+        stopSessionEvents();
+        setSessionId("");
+        state.accountName = null;
+        state.accountAvatar = null;
+        state.uid = null;
+        state.nicknames = null;
+        updateAuthUi();
+        renderInventory();
+        try { alert(msg || "Вход выполнен с другой вкладки"); } catch (e) { /* ignore */ }
+    }
+    function applySessionId(sid) {
+        if (!sid) return;
+        sessionKicked = false;
+        setSessionId(sid);
+        broadcastTakeover(sid);
+        stopSessionEvents();
+        const token = getAccountToken();
+        if (!token) return;
+        try {
+            const url = "https://api.agar.su/api/me/session/events?token=" +
+                encodeURIComponent(token) + "&sid=" + encodeURIComponent(sid);
+            sessionEs = new EventSource(url);
+            sessionEs.addEventListener("replaced", () => {
+                forceCabinetSessionKick("Вход выполнен с другой вкладки");
+            });
+        } catch (e) { /* ignore */ }
+    }
+    try {
+        sessionBC = new BroadcastChannel("agar-account-session");
+        sessionBC.onmessage = (ev) => {
+            const sid = ev && ev.data && ev.data.sid;
+            if (!sid) return;
+            if (getSessionId() && getSessionId() !== String(sid)) {
+                forceCabinetSessionKick("Вход выполнен с другой вкладки");
+            }
+        };
+    } catch (e) { /* ignore */ }
+    window.addEventListener("storage", (ev) => {
+        if (ev.key !== SESSION_TAKEOVER_KEY || !ev.newValue) return;
+        try {
+            const data = JSON.parse(ev.newValue);
+            if (!data || !data.sid) return;
+            if (getSessionId() && getSessionId() !== String(data.sid)) {
+                forceCabinetSessionKick("Вход выполнен с другой вкладки");
+            }
+        } catch (e) { /* ignore */ }
+    });
 
     function vkRandom(len) {
         const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
@@ -343,7 +428,7 @@
     }
 
     function updateAuthUi() {
-        const logged = !!getAccountToken();
+        const logged = !!getAccountToken() && !!getSessionId() && !sessionKicked;
         if (el.authGuest) el.authGuest.hidden = logged;
         if (el.authUser) el.authUser.hidden = !logged;
         if (!logged) return;
@@ -354,7 +439,7 @@
 
     async function loadAccountProfile() {
         const token = getAccountToken();
-        if (!token) {
+        if (!token || sessionKicked) {
             state.accountName = null;
             state.accountAvatar = null;
             state.uid = null;
@@ -365,20 +450,26 @@
         }
         try {
             const res = await fetch("https://api.agar.su/api/me/login", {
-                headers: { Authorization: "Game " + token },
+                headers: authHeaders(),
                 cache: "no-store"
             });
             const data = await res.json();
-            if (data.error || data.status === 401) {
-                setAccountToken("");
-                state.accountName = null;
-                state.accountAvatar = null;
-                state.uid = null;
-                state.nicknames = null;
-                updateAuthUi();
-                renderInventory();
+            if (data.error || data.status === 401 || data.error === "session_replaced") {
+                if (data.error === "session_replaced") {
+                    forceCabinetSessionKick(data.message || "Вход выполнен с другой вкладки");
+                } else {
+                    setAccountToken("");
+                    setSessionId("");
+                    state.accountName = null;
+                    state.accountAvatar = null;
+                    state.uid = null;
+                    state.nicknames = null;
+                    updateAuthUi();
+                    renderInventory();
+                }
                 return;
             }
+            if (data.session_id) applySessionId(data.session_id);
             state.accountName = data.account_name || null;
             state.accountAvatar = data.account_avatar || null;
             state.uid = data.uid != null ? data.uid : null;
@@ -392,7 +483,10 @@
     }
 
     function logoutAccount() {
+        stopSessionEvents();
         setAccountToken("");
+        setSessionId("");
+        sessionKicked = false;
         state.accountName = null;
         state.accountAvatar = null;
         state.uid = null;
@@ -436,6 +530,7 @@
                 return;
             }
             setAccountToken(data.token);
+            if (data.session_id) applySessionId(data.session_id);
             state.vkReady = false;
             await loadAccountProfile();
             openCabinet("profile");
@@ -839,11 +934,11 @@
         renderInventory();
         try {
             const res = await fetch("https://api.agar.su/api/me/nicknames", {
-                headers: { Authorization: "Game " + getAccountToken() },
+                headers: authHeaders(),
                 cache: "no-store"
             });
             if (res.status === 401) {
-                setAccountToken("");
+                forceCabinetSessionKick("Вход выполнен с другой вкладки");
                 state.nicknames = null;
                 updateAuthUi();
                 renderInventory();
@@ -1182,9 +1277,7 @@
             formData.append("image", processedFile, processedFile.name);
         }
 
-        const headers = {};
-        const token = getAccountToken();
-        if (token) headers.Authorization = "Game " + token;
+        const headers = authHeaders();
 
         shopPaying = true;
         updateShopPayBtn();
