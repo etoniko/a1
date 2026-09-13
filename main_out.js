@@ -1882,6 +1882,9 @@ setSpect() {
             if (isMe && this.playerCells[0]?.name) {
                 name = this.playerCells[0].name;
             }
+            if (window.AgarAntimat && typeof window.AgarAntimat.censor === "function") {
+                name = window.AgarAntimat.censor(name);
+            }
             var y = 64 + 28 * i;
             var rankNum = (isMe && myRank > 10 && i === visible.length - 1) ? myRank : (i + 1);
             var rankLabel = (!this.noRanking ? rankNum + ". " : "");
@@ -2348,7 +2351,10 @@ class Cell {
         return Math.max(~~(0.3 * this.size), 24);
     }
     setName(name) {
-        this.name = name;
+        const raw = name == null ? "" : String(name);
+        this.name = (window.AgarAntimat && typeof window.AgarAntimat.censor === "function")
+            ? window.AgarAntimat.censor(raw)
+            : raw;
         if (!this.nameCache) {
             this.nameCache = new UText(this.getNameSize(), "#FFFFFF", true, "#000000");
         }
