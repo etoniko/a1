@@ -80,7 +80,7 @@
     
     <!-- Стили и скрипты -->
     <link href="./index.css?13" rel="stylesheet">
-    <link href="./cabinet.css?8" rel="stylesheet">
+    <link href="./cabinet.css?12" rel="stylesheet">
     <script src="./antimat.js?3"></script>
     <script src="./main_out.js?78"></script>
     <script src="https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js"></script>
@@ -577,19 +577,6 @@ document.addEventListener('DOMContentLoaded', () => {
 <div id="cabinet" class="cabinet" aria-hidden="true">
     <div class="cabinet-panel" role="dialog" aria-label="Меню">
         <button type="button" class="cabinet-close" aria-label="Закрыть">&times;</button>
-        <div class="cabinet-head">
-            <div class="cabinet-avatar" id="cabinetAvatar"></div>
-            <div class="cabinet-head-meta">
-                <div class="cabinet-nick" id="cabinetNick">Гость</div>
-                <div class="cabinet-level-row">
-                    <span class="cabinet-star" aria-hidden="true"></span>
-                    <div class="cabinet-xp-wrap">
-                        <div class="cabinet-xp-bar"><div class="cabinet-xp-fill" id="cabinetXpFill"></div></div>
-                        <div class="cabinet-xp-text" id="cabinetXpText">Ур. 0 · 0 / 50 XP</div>
-                    </div>
-                </div>
-            </div>
-        </div>
         <nav class="cabinet-tabs">
             <button type="button" class="cabinet-tab is-active" data-tab="profile">Профиль</button>
             <button type="button" class="cabinet-tab" data-tab="rating">Рейтинг</button>
@@ -598,12 +585,89 @@ document.addEventListener('DOMContentLoaded', () => {
         </nav>
         <div class="cabinet-body">
             <section id="cab-profile" class="cabinet-section is-active">
-                <div class="cabinet-card" id="cabAuthCard">
+                <div class="cabinet-card cabinet-card--auth" id="cabAuthCard">
                     <div class="cab-auth" id="cabAuthGuest">
-                        <p class="cab-auth-title">Вход в ЛК</p>
-                        <p class="cab-auth-hint">VK · OK · Mail.ru</p>
-                        <div id="vkAuthContainer">
-                            <div id="VkIdSdkOneTap"></div>
+                        <!-- LOGIN -->
+                        <div class="cab-auth-card" id="authCardLogin">
+                            <form id="authLoginForm" class="cab-auth-form cab-auth-form--login" autocomplete="off">
+                                <div class="cab-auth-row-fields">
+                                    <input class="cab-auth-input" id="authLoginId" name="ulogin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="12" placeholder="ID" required autocomplete="off" spellcheck="false" aria-label="ID ЛК">
+                                    <input class="cab-auth-input" id="authLoginPass" name="pass" type="password" maxlength="64" placeholder="Pass" required autocomplete="current-password" aria-label="Пароль">
+                                </div>
+                                <p class="cab-auth-error" id="authLoginError" hidden></p>
+                                <button type="submit" class="cab-auth-play" id="authLoginBtn">Войти</button>
+                            </form>
+                            <div class="cab-auth-footer">
+                                <button type="button" class="cab-auth-textbtn" data-auth-view="recover">Восстановить</button>
+                                <span class="cab-auth-dot" aria-hidden="true"></span>
+                                <button type="button" class="cab-auth-textbtn" data-auth-view="register">Регистрация</button>
+                            </div>
+                        </div>
+
+                        <!-- REGISTER -->
+                        <div class="cab-auth-card" id="authCardRegister" hidden>
+                            <div class="cab-auth-steps" id="authRegSteps" aria-hidden="true">
+                                <span class="cab-auth-step is-on" data-step="1"></span>
+                                <span class="cab-auth-step" data-step="2"></span>
+                                <span class="cab-auth-step" data-step="3"></span>
+                            </div>
+                            <p class="cab-auth-hint" id="authRegHint">Почта для кода</p>
+                            <div id="authRegStepEmail" class="cab-auth-form">
+                                <input class="cab-auth-input" id="authRegEmail" type="email" maxlength="190" placeholder="email@mail.ru" autocomplete="email" aria-label="Email">
+                                <p class="cab-auth-error" id="authRegError" hidden></p>
+                                <button type="button" class="cab-auth-play" id="authRegSendBtn">Далее</button>
+                            </div>
+                            <div id="authRegStepCode" class="cab-auth-form" hidden>
+                                <input class="cab-auth-input cab-auth-input--code" id="authRegCode" type="text" inputmode="numeric" maxlength="5" placeholder="•••••" autocomplete="one-time-code" aria-label="Код">
+                                <p class="cab-auth-error" id="authRegErrorCode" hidden></p>
+                                <button type="button" class="cab-auth-play" id="authRegVerifyBtn">Ок</button>
+                                <p class="cab-auth-timer" id="authRegTimer" hidden>Код через <b>5:00</b></p>
+                                <button type="button" class="cab-auth-textbtn" id="authRegResendBtn" hidden>Новый код</button>
+                            </div>
+                            <div id="authRegStepPass" class="cab-auth-form" hidden>
+                                <input class="cab-auth-input" id="authRegPass" type="password" maxlength="64" placeholder="Новый пароль" autocomplete="new-password" aria-label="Пароль">
+                                <p class="cab-auth-error" id="authRegErrorPass" hidden></p>
+                                <button type="button" class="cab-auth-play cab-auth-play--gold" id="authRegCreateBtn">Создать</button>
+                            </div>
+                            <div class="cab-auth-footer">
+                                <button type="button" class="cab-auth-textbtn" data-auth-view="login">← Назад</button>
+                            </div>
+                        </div>
+
+                        <!-- RECOVER -->
+                        <div class="cab-auth-card" id="authCardRecover" hidden>
+                            <p class="cab-auth-hint" id="authRecHint">Как восстановить?</p>
+                            <div id="authRecPick" class="cab-auth-methods">
+                                <button type="button" class="cab-auth-chip" data-rec-method="email">Почта</button>
+                                <button type="button" class="cab-auth-chip cab-auth-chip--vk" data-rec-method="vk">VK</button>
+                                <button type="button" class="cab-auth-chip cab-auth-chip--google" data-rec-method="google">Google</button>
+                                <button type="button" class="cab-auth-chip cab-auth-chip--tg" data-rec-method="telegram">TG</button>
+                                <p class="cab-auth-error" id="authRecError" hidden></p>
+                            </div>
+                            <div id="authRecStepEmail" class="cab-auth-form" hidden>
+                                <input class="cab-auth-input" id="authRecEmail" type="email" maxlength="190" placeholder="email@mail.ru" autocomplete="email" aria-label="Email">
+                                <p class="cab-auth-error" id="authRecErrorEmail" hidden></p>
+                                <button type="button" class="cab-auth-play" id="authRecSendBtn">Код</button>
+                                <button type="button" class="cab-auth-textbtn" id="authRecBackPick">← Способы</button>
+                            </div>
+                            <div id="authRecStepGoogle" class="cab-auth-form" hidden>
+                                <div id="authRecGoogleWrap" class="cab-auth-google-wrap"></div>
+                                <button type="button" class="cab-auth-textbtn" data-rec-back>← Способы</button>
+                            </div>
+                            <div id="authRecStepCode" class="cab-auth-form" hidden>
+                                <input class="cab-auth-input cab-auth-input--code" id="authRecCode" type="text" inputmode="numeric" maxlength="5" placeholder="•••••" autocomplete="one-time-code" aria-label="Код">
+                                <p class="cab-auth-error" id="authRecErrorCode" hidden></p>
+                                <button type="button" class="cab-auth-play" id="authRecVerifyBtn">Ок</button>
+                                <p class="cab-auth-timer" id="authRecTimer" hidden>Код через <b>5:00</b></p>
+                                <button type="button" class="cab-auth-textbtn" id="authRecResendBtn" hidden>Новый код</button>
+                            </div>
+                            <div id="authRecStepPass" class="cab-auth-form" hidden>
+                                <input class="cab-auth-input" id="authRecPass" type="password" maxlength="64" placeholder="Новый пароль" autocomplete="new-password" aria-label="Пароль">
+                                <button type="button" class="cab-auth-play cab-auth-play--gold" id="authRecSetPassBtn">Сохранить</button>
+                            </div>
+                            <div class="cab-auth-footer">
+                                <button type="button" class="cab-auth-textbtn" data-auth-view="login">← Назад</button>
+                            </div>
                         </div>
                     </div>
                     <div class="cab-auth-user" id="cabAuthUser" hidden>
@@ -615,23 +679,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button type="button" class="cabinet-btn gray" id="cabLogoutBtn">Выйти</button>
                     </div>
                 </div>
-                <div class="cabinet-card">
-                    <div class="cabinet-stats" style="margin-top:0">
-                        <div class="cabinet-stat"><b id="cabinetStatXp">0</b><span>XP</span></div>
-                        <div class="cabinet-stat"><b id="cabinetStatLvl">0</b><span>Уровень</span></div>
-                        <div class="cabinet-stat"><b id="cabinetStatUid">—</b><span>ID</span></div>
+                <div id="cabProfileExtra" class="cab-profile-extra" hidden>
+                    <div class="cabinet-card cabinet-card--stats">
+                        <div class="cabinet-stats">
+                            <div class="cabinet-stat"><b id="cabinetStatXp">0</b><span>XP</span></div>
+                            <div class="cabinet-stat"><b id="cabinetStatLvl">0</b><span>Ур.</span></div>
+                            <div class="cabinet-stat"><b id="cabinetStatUid">—</b><span>ID</span></div>
+                        </div>
                     </div>
-                </div>
-                <div class="cabinet-card cab-inv" id="cabInventory">
-                    <h3>Мои покупки</h3>
-                    <p class="cabinet-muted" id="cabInvHint">Войдите, чтобы увидеть ники, кланы и скины</p>
-                    <div class="cab-inv-tabs" id="cabInvTabs" hidden>
-                        <button type="button" class="cab-inv-tab is-active" data-inv="nicks">Ники <span class="cab-inv-badge" id="badgeNick">0</span></button>
-                        <button type="button" class="cab-inv-tab" data-inv="clans">Кланы <span class="cab-inv-badge" id="badgeClan">0</span></button>
-                    </div>
-                    <div class="cab-inv-panels" id="cabInvPanels" hidden>
-                        <ul class="cab-inv-list is-active" id="myNickList" data-inv-panel="nicks"></ul>
-                        <ul class="cab-inv-list" id="myClanList" data-inv-panel="clans"></ul>
+                    <div class="cabinet-card cab-inv" id="cabInventory">
+                        <h3>Покупки</h3>
+                        <p class="cabinet-muted" id="cabInvHint">Ники и кланы с аккаунта</p>
+                        <div class="cab-inv-tabs" id="cabInvTabs" hidden>
+                            <button type="button" class="cab-inv-tab is-active" data-inv="nicks">Ники <span class="cab-inv-badge" id="badgeNick">0</span></button>
+                            <button type="button" class="cab-inv-tab" data-inv="clans">Кланы <span class="cab-inv-badge" id="badgeClan">0</span></button>
+                        </div>
+                        <div class="cab-inv-panels" id="cabInvPanels" hidden>
+                            <ul class="cab-inv-list is-active" id="myNickList" data-inv-panel="nicks"></ul>
+                            <ul class="cab-inv-list" id="myClanList" data-inv-panel="clans"></ul>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -718,6 +784,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 </div>
-<script src="./cabinet.js?12"></script>
+<script src="./cabinet.js?17"></script>
 </body>
 </html>

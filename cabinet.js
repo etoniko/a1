@@ -49,10 +49,21 @@
     }
 
     const TOKEN_KEY = "accountToken";
+    const API = "https://api.agar.su/api";
+    const PASS_RE = /^[0-9a-zA-Z.]{4,64}$/;
     const VK_APP = 54069355;
     const VK_REDIRECT = "https://agar.su";
     const VK_VERIFIER_KEY = "vk_code_verifier";
     const VK_STATE_KEY = "vk_state";
+    const TG_AUTH_URL = "https://agar.su/telegram/";
+
+    let registerToken = null;
+    let recoverToken = null;
+    let providers = null;
+    let googleInited = false;
+    let regTimerId = null;
+    let recTimerId = null;
+    let authWired = false;
 
     function getAccountToken() {
         try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
@@ -98,6 +109,531 @@
             try { sessionStorage.removeItem(key); } catch (e) { /* ignore */ }
             try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
         });
+    }
+
+    function auth$(id) {
+        return document.getElementById(id);
+    }
+    function setAuthErr(el, text) {
+        if (!el) return;
+        el.hidden = !text;
+        el.textContent = text || "";
+    }
+    function clearRecErr() {
+        setAuthErr(auth$("authRecError"), "");
+        setAuthErr(auth$("authRecErrorEmail"), "");
+        setAuthErr(auth$("authRecErrorCode"), "");
+    }
+    function fmtAuthTime(sec) {
+        const s = Math.max(0, Math.floor(sec));
+        return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+    }
+    function stopAuthTimer(kind) {
+        if (kind === "reg" && regTimerId) { clearInterval(regTimerId); regTimerId = null; }
+        if (kind === "rec" && recTimerId) { clearInterval(recTimerId); recTimerId = null; }
+    }
+    function startAuthCooldown(kind, sec) {
+        const total = Math.max(1, Number(sec) || 300);
+        const timerEl = auth$(kind === "reg" ? "authRegTimer" : "authRecTimer");
+        const resendBtn = auth$(kind === "reg" ? "authRegResendBtn" : "authRecResendBtn");
+        stopAuthTimer(kind);
+        if (timerEl) {
+            timerEl.hidden = false;
+            timerEl.innerHTML = "Новый код через <b>" + fmtAuthTime(total) + "</b>";
+        }
+        if (resendBtn) resendBtn.hidden = true;
+        let left = total;
+        const id = setInterval(() => {
+            left -= 1;
+            if (left <= 0) {
+                stopAuthTimer(kind);
+                if (timerEl) { timerEl.hidden = true; timerEl.innerHTML = ""; }
+                if (resendBtn) resendBtn.hidden = false;
+                return;
+            }
+            if (timerEl) timerEl.innerHTML = "Новый код через <b>" + fmtAuthTime(left) + "</b>";
+        }, 1000);
+        if (kind === "reg") regTimerId = id;
+        else recTimerId = id;
+    }
+    function setRegStep(n) {
+        document.querySelectorAll("#authRegSteps .cab-auth-step").forEach((el) => {
+            el.classList.toggle("is-on", Number(el.getAttribute("data-step")) <= n);
+        });
+    }
+    function hideAuthIds(ids) {
+        ids.forEach((id) => {
+            const el = auth$(id);
+            if (el) el.hidden = true;
+        });
+    }
+    function showAuthView(name) {
+        const login = auth$("authCardLogin");
+        const reg = auth$("authCardRegister");
+        const rec = auth$("authCardRecover");
+        if (login) login.hidden = name !== "login";
+        if (reg) reg.hidden = name !== "register";
+        if (rec) rec.hidden = name !== "recover";
+        if (name === "register") resetRegister();
+        if (name === "recover") resetRecover();
+    }
+    function resetRegister() {
+        registerToken = null;
+        stopAuthTimer("reg");
+        setAuthErr(auth$("authRegError"), "");
+        setAuthErr(auth$("authRegErrorCode"), "");
+        setAuthErr(auth$("authRegErrorPass"), "");
+        hideAuthIds(["authRegStepCode", "authRegStepPass"]);
+        const email = auth$("authRegStepEmail");
+        if (email) email.hidden = false;
+        setRegStep(1);
+        const hint = auth$("authRegHint");
+        if (hint) hint.textContent = "Укажите почту";
+        const resend = auth$("authRegResendBtn");
+        if (resend) resend.hidden = true;
+        const timer = auth$("authRegTimer");
+        if (timer) timer.hidden = true;
+    }
+    function resetRecover() {
+        persistRecoverToken(null);
+        stopAuthTimer("rec");
+        clearRecErr();
+        hideAuthIds([
+            "authRecStepEmail", "authRecStepGoogle", "authRecStepCode", "authRecStepPass"
+        ]);
+        const pick = auth$("authRecPick");
+        if (pick) pick.hidden = false;
+        const hint = auth$("authRecHint");
+        if (hint) hint.textContent = "Выберите способ";
+        const resend = auth$("authRecResendBtn");
+        if (resend) resend.hidden = true;
+        const timer = auth$("authRecTimer");
+        if (timer) timer.hidden = true;
+    }
+    function showRecOnly(stepId, hintText) {
+        hideAuthIds([
+            "authRecPick", "authRecStepEmail", "authRecStepGoogle",
+            "authRecStepCode", "authRecStepPass"
+        ]);
+        const step = auth$(stepId);
+        if (step) step.hidden = false;
+        const hint = auth$("authRecHint");
+        if (hint && hintText) hint.textContent = hintText;
+    }
+    function persistRecoverToken(token) {
+        recoverToken = token || null;
+        try {
+            if (token) sessionStorage.setItem("lk_recover_token", token);
+            else sessionStorage.removeItem("lk_recover_token");
+        } catch (_) {}
+    }
+    function loadRecoverToken() {
+        if (recoverToken) return recoverToken;
+        try { recoverToken = sessionStorage.getItem("lk_recover_token"); } catch (_) {}
+        return recoverToken;
+    }
+    function openRecoverPassword(token) {
+        if (!token) return;
+        const login = auth$("authCardLogin");
+        const reg = auth$("authCardRegister");
+        const rec = auth$("authCardRecover");
+        if (login) login.hidden = true;
+        if (reg) reg.hidden = true;
+        if (rec) rec.hidden = false;
+        persistRecoverToken(token);
+        clearRecErr();
+        showRecOnly("authRecStepPass", "Придумайте новый пароль");
+    }
+
+    async function authApi(path, body, timeoutMs) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs || 25000);
+        try {
+            const res = await fetch(API + path, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body || {}),
+                signal: ctrl.signal
+            });
+            let data = {};
+            try { data = await res.json(); } catch (_) {}
+            return { res, data };
+        } catch (e) {
+            if (e && e.name === "AbortError") {
+                return { res: { ok: false, status: 408 }, data: { error: "Сервер не ответил. Попробуйте ещё раз." } };
+            }
+            throw e;
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+    async function loadProviders() {
+        if (providers) return providers;
+        try {
+            const res = await fetch(API + "/auth/providers");
+            providers = await res.json();
+        } catch (_) {
+            providers = {};
+        }
+        return providers;
+    }
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector('script[src="' + src + '"]')) return resolve();
+            const s = document.createElement("script");
+            s.src = src;
+            s.async = true;
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error("script"));
+            document.head.appendChild(s);
+        });
+    }
+
+    async function finishLogin(token) {
+        if (!token) return;
+        setAccountToken(token);
+        await loadAccountProfile();
+        openCabinet("profile");
+        calculateShop();
+    }
+
+    async function doLogin(ev) {
+        if (ev) ev.preventDefault();
+        const err = auth$("authLoginError");
+        const btn = auth$("authLoginBtn");
+        const ulogin = (auth$("authLoginId") && auth$("authLoginId").value || "").trim();
+        const pass = auth$("authLoginPass") && auth$("authLoginPass").value || "";
+        setAuthErr(err, "");
+        if (!/^\d{1,12}$/.test(ulogin)) return setAuthErr(err, "Введите ID ЛК (число)");
+        if (!pass) return setAuthErr(err, "Введите пароль");
+        if (btn) btn.disabled = true;
+        try {
+            const { res, data } = await authApi("/auth/login", { ulogin, pass });
+            if (!res.ok || data.error || !data.token) {
+                setAuthErr(err, data.error || "Ошибка входа");
+                return;
+            }
+            await finishLogin(data.token);
+        } catch (_) {
+            setAuthErr(err, "Ошибка сети");
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function regSend(isResend) {
+        const err = isResend ? auth$("authRegErrorCode") : auth$("authRegError");
+        const btn = isResend ? auth$("authRegResendBtn") : auth$("authRegSendBtn");
+        const email = (auth$("authRegEmail") && auth$("authRegEmail").value || "").trim();
+        setAuthErr(err, "");
+        if (btn) btn.disabled = true;
+        if (err) { err.hidden = false; err.textContent = "Отправляем код…"; }
+        try {
+            const { res, data } = await authApi("/auth/register/send-code", { email }, 28000);
+            if (!res.ok || data.error) {
+                setAuthErr(err, data.error || "Не удалось отправить код");
+                if (data.cooldownSec) startAuthCooldown("reg", data.cooldownSec);
+                return;
+            }
+            auth$("authRegStepEmail").hidden = true;
+            auth$("authRegStepCode").hidden = false;
+            setRegStep(2);
+            auth$("authRegHint").textContent = "Код из письма";
+            startAuthCooldown("reg", data.cooldownSec || 300);
+        } catch (_) {
+            setAuthErr(err, "Ошибка сети");
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function regVerify() {
+        const err = auth$("authRegErrorCode") || auth$("authRegError");
+        const email = (auth$("authRegEmail") && auth$("authRegEmail").value || "").trim();
+        const code = (auth$("authRegCode") && auth$("authRegCode").value || "").trim();
+        setAuthErr(err, "");
+        try {
+            const { res, data } = await authApi("/auth/register/verify-code", { email, code });
+            if (!res.ok || data.error || !data.registerToken) {
+                setAuthErr(err, data.error || "Неверный код");
+                return;
+            }
+            registerToken = data.registerToken;
+            stopAuthTimer("reg");
+            auth$("authRegStepCode").hidden = true;
+            auth$("authRegStepPass").hidden = false;
+            setRegStep(3);
+            auth$("authRegHint").textContent = "Придумайте пароль";
+        } catch (_) {
+            setAuthErr(err, "Ошибка сети");
+        }
+    }
+
+    async function regCreate() {
+        const err = auth$("authRegErrorPass") || auth$("authRegError");
+        const pass = auth$("authRegPass") && auth$("authRegPass").value || "";
+        setAuthErr(err, "");
+        if (!PASS_RE.test(pass)) return setAuthErr(err, "Пароль: латиница, цифры и точка, 4–64");
+        try {
+            const { res, data } = await authApi("/auth/register/create", { registerToken, pass });
+            if (!res.ok || data.error || !data.token) {
+                setAuthErr(err, data.error || "Не удалось создать");
+                return;
+            }
+            alert("ЛК создан! ID: " + data.uid + "\nДанные также на почте.");
+            await finishLogin(data.token);
+        } catch (_) {
+            setAuthErr(err, "Ошибка сети");
+        }
+    }
+
+    async function recSend(isResend) {
+        const err = isResend
+            ? (auth$("authRecErrorCode") || auth$("authRecError"))
+            : (auth$("authRecErrorEmail") || auth$("authRecError"));
+        const email = (auth$("authRecEmail") && auth$("authRecEmail").value || "").trim();
+        setAuthErr(err, "");
+        try {
+            const { res, data } = await authApi("/auth/recover/send-code", { email });
+            if (!res.ok || data.error) {
+                setAuthErr(err, data.error || "Не удалось отправить код");
+                if (data.cooldownSec) startAuthCooldown("rec", data.cooldownSec);
+                return;
+            }
+            showRecOnly("authRecStepCode", "Код из письма");
+            startAuthCooldown("rec", data.cooldownSec || 300);
+        } catch (_) {
+            setAuthErr(err, "Ошибка сети");
+        }
+    }
+
+    async function recVerify() {
+        const err = auth$("authRecErrorCode") || auth$("authRecError");
+        const email = (auth$("authRecEmail") && auth$("authRecEmail").value || "").trim();
+        const code = (auth$("authRecCode") && auth$("authRecCode").value || "").trim();
+        setAuthErr(err, "");
+        try {
+            const { res, data } = await authApi("/auth/recover/verify-code", { email, code });
+            if (!res.ok || data.error || !data.recoverToken) {
+                setAuthErr(err, data.error || "Неверный код");
+                return;
+            }
+            stopAuthTimer("rec");
+            openRecoverPassword(data.recoverToken);
+        } catch (_) {
+            setAuthErr(err, "Ошибка сети");
+        }
+    }
+
+    async function recSetPass() {
+        const pass = auth$("authRecPass") && auth$("authRecPass").value || "";
+        const token = loadRecoverToken();
+        if (!token) {
+            const hint = auth$("authRecHint");
+            if (hint) hint.textContent = "Сессия сброшена. Выберите способ заново.";
+            resetRecover();
+            return;
+        }
+        if (!PASS_RE.test(pass)) {
+            const hint = auth$("authRecHint");
+            if (hint) hint.textContent = "Пароль: латиница, цифры и точка, 4–64";
+            return;
+        }
+        try {
+            const { res, data } = await authApi("/auth/recover/set-password", {
+                recoverToken: token,
+                pass
+            });
+            if (!res.ok || data.error || !data.token) {
+                const hint = auth$("authRecHint");
+                if (hint) hint.textContent = data.error || "Не удалось сохранить";
+                return;
+            }
+            persistRecoverToken(null);
+            alert("Пароль сохранён. ID ЛК: " + data.uid);
+            await finishLogin(data.token);
+        } catch (_) {
+            const hint = auth$("authRecHint");
+            if (hint) hint.textContent = "Ошибка сети";
+        }
+    }
+
+    async function applySocialRecover(path, body) {
+        clearRecErr();
+        const hint = auth$("authRecHint");
+        if (hint) hint.textContent = "Проверяем…";
+        try {
+            const { res, data } = await authApi(path, body);
+            if (!res.ok || data.error || !data.recoverToken) {
+                resetRecover();
+                setAuthErr(auth$("authRecError"), data.error || "В ЛК нет связанного аккаунта");
+                return;
+            }
+            openRecoverPassword(data.recoverToken);
+        } catch (_) {
+            resetRecover();
+            setAuthErr(auth$("authRecError"), "Ошибка сети");
+        }
+    }
+
+    async function initGoogleRecover() {
+        const cfg = await loadProviders();
+        const clientId = cfg.googleClientId;
+        const wrap = auth$("authRecGoogleWrap");
+        if (!clientId || !wrap) return;
+        try {
+            await loadScript("https://accounts.google.com/gsi/client");
+            window.google.accounts.id.initialize({
+                client_id: clientId,
+                callback: (response) => {
+                    if (response && response.credential) {
+                        applySocialRecover("/auth/recover/google", { credential: response.credential });
+                    }
+                }
+            });
+            if (!googleInited) {
+                wrap.innerHTML = "";
+                window.google.accounts.id.renderButton(wrap, {
+                    type: "standard",
+                    size: "medium",
+                    theme: "outline",
+                    text: "continue_with",
+                    shape: "rectangular",
+                    width: 280
+                });
+                googleInited = true;
+            }
+        } catch (_) {
+            setAuthErr(auth$("authRecError"), "Не удалось загрузить Google");
+            resetRecover();
+        }
+    }
+
+    function startVkRecover() {
+        window._lkRecoverVkMode = true;
+        const hint = auth$("authRecHint");
+        if (hint) hint.textContent = "Откройте окно VK…";
+        hideAuthIds([
+            "authRecPick", "authRecStepEmail", "authRecStepGoogle",
+            "authRecStepCode", "authRecStepPass"
+        ]);
+        (async () => {
+            try {
+                if (!window.VKIDSDK) {
+                    await loadScript("https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js");
+                }
+                const VKID = window.VKIDSDK;
+                if (!VKID) throw new Error("no sdk");
+                const codeVerifier = vkRandom(64);
+                const stateVal = vkRandom(32);
+                persistPkce(codeVerifier, stateVal);
+                VKID.Config.init({
+                    app: VK_APP,
+                    redirectUrl: VK_REDIRECT,
+                    state: stateVal,
+                    codeVerifier,
+                    responseMode: VKID.ConfigResponseMode.Callback,
+                    source: VKID.ConfigSource.LOWCODE,
+                    scope: ""
+                });
+                const result = VKID.Auth.login({ provider: VKID.OAuthName.VK });
+                if (result && typeof result.then === "function") {
+                    const payload = await result;
+                    if (payload && payload.code) {
+                        window.onVkAuth({
+                            code: payload.code,
+                            device_id: payload.device_id,
+                            code_verifier: codeVerifier,
+                            state: stateVal
+                        });
+                    }
+                }
+            } catch (e) {
+                window._lkRecoverVkMode = false;
+                resetRecover();
+                setAuthErr(auth$("authRecError"), "Не удалось открыть VK");
+            }
+        })();
+    }
+
+    function pickRecoverMethod(method) {
+        clearRecErr();
+        if (method === "email") {
+            showRecOnly("authRecStepEmail", "Email аккаунта");
+            return;
+        }
+        if (method === "google") {
+            showRecOnly("authRecStepGoogle", "Войдите через Google");
+            initGoogleRecover();
+            return;
+        }
+        if (method === "vk") {
+            startVkRecover();
+            return;
+        }
+        if (method === "telegram") {
+            const hint = auth$("authRecHint");
+            if (hint) hint.textContent = "Откройте Telegram…";
+            hideAuthIds([
+                "authRecPick", "authRecStepEmail", "authRecStepGoogle",
+                "authRecStepCode", "authRecStepPass"
+            ]);
+            window._telegramRecoverMode = true;
+            window.open(TG_AUTH_URL, "tgAuth", "width=420,height=520");
+        }
+    }
+
+    function wireLkAuth() {
+        if (authWired) return;
+        authWired = true;
+        document.querySelectorAll("[data-auth-view]").forEach((btn) => {
+            btn.addEventListener("click", () => showAuthView(btn.getAttribute("data-auth-view")));
+        });
+        const idInput = auth$("authLoginId");
+        if (idInput) {
+            idInput.addEventListener("input", () => {
+                const digits = idInput.value.replace(/\D/g, "").slice(0, 12);
+                if (idInput.value !== digits) idInput.value = digits;
+            });
+        }
+        const loginForm = auth$("authLoginForm");
+        if (loginForm) loginForm.addEventListener("submit", doLogin);
+        auth$("authRegSendBtn") && auth$("authRegSendBtn").addEventListener("click", () => regSend(false));
+        auth$("authRegResendBtn") && auth$("authRegResendBtn").addEventListener("click", () => regSend(true));
+        auth$("authRegVerifyBtn") && auth$("authRegVerifyBtn").addEventListener("click", regVerify);
+        auth$("authRegCreateBtn") && auth$("authRegCreateBtn").addEventListener("click", regCreate);
+        auth$("authRecSendBtn") && auth$("authRecSendBtn").addEventListener("click", () => recSend(false));
+        auth$("authRecResendBtn") && auth$("authRecResendBtn").addEventListener("click", () => recSend(true));
+        auth$("authRecVerifyBtn") && auth$("authRecVerifyBtn").addEventListener("click", recVerify);
+        auth$("authRecSetPassBtn") && auth$("authRecSetPassBtn").addEventListener("click", recSetPass);
+        document.querySelectorAll("[data-rec-method]").forEach((btn) => {
+            btn.addEventListener("click", () => pickRecoverMethod(btn.getAttribute("data-rec-method")));
+        });
+        auth$("authRecBackPick") && auth$("authRecBackPick").addEventListener("click", resetRecover);
+        document.querySelectorAll("[data-rec-back]").forEach((btn) => {
+            btn.addEventListener("click", resetRecover);
+        });
+        window.addEventListener("message", (event) => {
+            if (!event.data || event.data.type !== "telegram-auth") return;
+            if (!window._telegramRecoverMode) return;
+            window._telegramRecoverMode = false;
+            applySocialRecover("/auth/recover/telegram", event.data.user);
+        });
+    }
+
+    function requireLkForShop() {
+        if (getAccountToken()) return true;
+        openCabinet("profile");
+        showAuthView("login");
+        return false;
+    }
+
+    function updateShopAuthHint() {
+        const hint = document.getElementById("cabShopAuthHint");
+        if (hint) {
+            hint.hidden = true;
+            hint.textContent = "";
+        }
     }
 
     const el = {
@@ -344,8 +880,19 @@
 
     function updateAuthUi() {
         const logged = !!getAccountToken();
-        if (el.authGuest) el.authGuest.hidden = logged;
-        if (el.authUser) el.authUser.hidden = !logged;
+        if (el.authGuest) {
+            el.authGuest.hidden = !!logged;
+            el.authGuest.style.display = logged ? "none" : "";
+        }
+        if (el.authUser) {
+            el.authUser.hidden = !logged;
+            el.authUser.style.display = logged ? "flex" : "none";
+        }
+        const extra = document.getElementById("cabProfileExtra");
+        if (extra) {
+            extra.hidden = !logged;
+            extra.style.display = logged ? "" : "none";
+        }
         if (!logged) return;
         if (el.authName) el.authName.textContent = state.accountName || "Игрок";
         if (el.authMeta) el.authMeta.textContent = "ID " + (state.uid != null ? state.uid : "—");
@@ -361,6 +908,8 @@
             state.nicknames = null;
             updateAuthUi();
             renderInventory();
+            calculateShop();
+            updateShopAuthHint();
             return;
         }
         try {
@@ -377,6 +926,8 @@
                 state.nicknames = null;
                 updateAuthUi();
                 renderInventory();
+                calculateShop();
+                updateShopAuthHint();
                 return;
             }
             state.accountName = data.account_name || null;
@@ -397,16 +948,15 @@
         state.accountAvatar = null;
         state.uid = null;
         state.nicknames = null;
-        state.vkReady = false;
         updateXpUi(state.xp);
         updateAuthUi();
         renderInventory();
-        if (el.root && el.root.classList.contains("is-open")) {
-            ensureVkWidget(true);
-        }
+        showAuthView("login");
+        calculateShop();
+        updateShopAuthHint();
     }
 
-    async function completeVkLogin(payload) {
+    function handleVkRecover(payload) {
         if (!payload || !payload.code || !payload.device_id) {
             alert("VK: не получен код авторизации");
             return;
@@ -423,26 +973,8 @@
             return;
         }
         clearPkce();
-        try {
-            const res = await fetch("https://api.agar.su/api/auth/vk", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body)
-            });
-            const data = await res.json();
-            if (data.error || !data.token) {
-                alert(data.error || "Ошибка авторизации");
-                ensureVkWidget(true);
-                return;
-            }
-            setAccountToken(data.token);
-            state.vkReady = false;
-            await loadAccountProfile();
-            openCabinet("profile");
-        } catch (e) {
-            alert("Ошибка сети при авторизации");
-            ensureVkWidget(true);
-        }
+        window._lkRecoverVkMode = false;
+        applySocialRecover("/auth/recover/vk", body);
     }
 
     function handleVkUrlCallback() {
@@ -450,12 +982,16 @@
         const code = params.get("code");
         const deviceId = params.get("device_id");
         if (!code || !deviceId) return false;
+        if (!window._lkRecoverVkMode) {
+            window.history.replaceState({}, "", window.location.pathname + window.location.hash);
+            return false;
+        }
         const pkce = readPkce();
         if (!pkce.codeVerifier || !pkce.state) {
             alert("VK: обновите страницу и войдите снова");
             return false;
         }
-        completeVkLogin({
+        handleVkRecover({
             code,
             device_id: deviceId,
             code_verifier: pkce.codeVerifier,
@@ -463,94 +999,6 @@
         });
         window.history.replaceState({}, "", window.location.pathname + window.location.hash);
         return true;
-    }
-
-    function ensureVkWidget(force) {
-        if (getAccountToken()) {
-            updateAuthUi();
-            return;
-        }
-        if (!("VKIDSDK" in window)) {
-            const box = document.getElementById("VkIdSdkOneTap");
-            if (box && !box.dataset.waitSdk) {
-                box.dataset.waitSdk = "1";
-                box.innerHTML = '<p class="cab-auth-hint" style="margin:0">Загрузка входа…</p>';
-                waitForVkSdk().then(() => ensureVkWidget(true));
-            }
-            return;
-        }
-        if (!el.root || !el.root.classList.contains("is-open")) return;
-        if (state.tab !== "profile") return;
-        if (el.authGuest && el.authGuest.hidden) return;
-        if (state.vkReady && !force) return;
-
-        const container = document.getElementById("VkIdSdkOneTap");
-        if (!container) return;
-
-        const VKID = window.VKIDSDK;
-        const codeVerifier = vkRandom(64);
-        const stateVal = vkRandom(32);
-        persistPkce(codeVerifier, stateVal);
-
-        try {
-            VKID.Config.init({
-                app: VK_APP,
-                redirectUrl: VK_REDIRECT,
-                state: stateVal,
-                codeVerifier,
-                responseMode: VKID.ConfigResponseMode.Callback,
-                source: VKID.ConfigSource.LOWCODE,
-                scope: ""
-            });
-            container.innerHTML = "";
-            new VKID.OneTap().render({
-                container,
-                showAlternativeLogin: true,
-                oauthList: ["mail_ru", "ok_ru"],
-                styles: { width: 320, height: 44, borderRadius: 10 },
-                skin: VKID.OneTapSkin.Primary,
-                scheme: VKID.Scheme.LIGHT,
-                lang: VKID.Languages.RUS
-            }).on(VKID.WidgetEvents.ERROR, (err) => {
-                console.error("VK ID error", err);
-                const msg = err && (err.error_description || err.error || err.text);
-                if (msg) alert("VK: " + msg);
-            }).on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, (payload) => {
-                completeVkLogin({
-                    code: payload.code,
-                    device_id: payload.device_id,
-                    code_verifier: codeVerifier,
-                    state: stateVal
-                });
-            });
-            state.vkReady = true;
-        } catch (e) {
-            console.error("VK ID init failed", e);
-            container.innerHTML = '<p class="cab-auth-hint" style="margin:0;color:#d64545">Не удалось загрузить вход VK</p>';
-            state.vkReady = false;
-        }
-    }
-
-    function waitForVkSdk() {
-        return new Promise((resolve) => {
-            if (window.VKIDSDK) return resolve(true);
-            let tries = 0;
-            const t = setInterval(() => {
-                tries++;
-                if (window.VKIDSDK || tries > 40) {
-                    clearInterval(t);
-                    resolve(!!window.VKIDSDK);
-                }
-            }, 150);
-            document.querySelector('script[src*="vkid"]')?.addEventListener("load", () => {
-                clearInterval(t);
-                resolve(!!window.VKIDSDK);
-            });
-        });
-    }
-
-    function initVkAuth(force) {
-        ensureVkWidget(force);
     }
 
     async function renderRating() {
@@ -1001,7 +1449,8 @@
         s.rotCost.textContent = (rotationCost * mult) + " ₽";
         s.total.textContent = total + " ₽";
         const hasItem = !!(pass || file || s.inv.checked || s.rot.checked);
-        s.buy.disabled = !(nick && hasItem && total > 0);
+        const logged = !!getAccountToken();
+        s.buy.disabled = !(logged && nick && hasItem && total > 0);
     }
 
     function previewShopFile(file) {
@@ -1044,7 +1493,8 @@
     }
 
     async function submitShop(e) {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
+        if (!requireLkForShop()) return;
         const s = shopEls();
         const nickname = (s.nick.value || "").trim().toLowerCase();
         const password = (s.pass.value || "").trim().toLowerCase();
@@ -1170,18 +1620,22 @@
             calculateShop();
         });
         s.form.addEventListener("submit", submitShop);
+        if (s.buy) s.buy.addEventListener("click", submitShop);
         calculateShop();
     }
 
     function openCabinet(tab) {
         if (!el.root) return;
         if (tab === "leaderboard" || tab === "donate") tab = tab === "donate" ? "shop" : "rating";
+        if (tab === "shop" && !getAccountToken()) {
+            tab = "profile";
+            showAuthView("login");
+        }
         el.root.classList.add("is-open");
         el.root.setAttribute("aria-hidden", "false");
         if (tab) setTab(tab);
         else if (!state.tab) setTab("profile");
         else updateXpUi(state.xp);
-        requestAnimationFrame(() => ensureVkWidget(false));
     }
     function closeCabinet() {
         if (!el.root) return;
@@ -1189,8 +1643,12 @@
         el.root.setAttribute("aria-hidden", "true");
     }
     function setTab(tab) {
-        const prev = state.tab;
+        if (tab === "shop" && !getAccountToken()) {
+            tab = "profile";
+            showAuthView("login");
+        }
         state.tab = tab;
+        if (el.root) el.root.setAttribute("data-tab", tab);
         $all(".cabinet-tab", el.root).forEach((btn) => {
             btn.classList.toggle("is-active", btn.dataset.tab === tab);
         });
@@ -1201,7 +1659,6 @@
         if (tab === "rating") renderRating();
         if (tab === "shop") calculateShop();
         if (tab === "profile") {
-            requestAnimationFrame(() => ensureVkWidget(false));
             setTimeout(() => loadMyNicknames(false), 0);
         }
     }
@@ -1326,14 +1783,24 @@
         }
 
         bindShop();
+        wireLkAuth();
         bindOpeners();
         bindNickSkin();
         const warmSkins = () => { ensureSkinMap().catch(() => {}); };
         if (typeof requestIdleCallback === "function") requestIdleCallback(warmSkins, { timeout: 4000 });
         else setTimeout(warmSkins, 1500);
-        window.onVkAuth = completeVkLogin;
+        window.onVkAuth = function (payload) {
+            if (window._lkRecoverVkMode) {
+                handleVkRecover(payload);
+                return;
+            }
+            alert("Вход по ID ЛК и паролю. Если пароля нет — «Восстановить» через VK / Google / Telegram / email.");
+        };
         handleVkUrlCallback();
         loadAccountProfile();
+        showAuthView("login");
+        calculateShop();
+        updateShopAuthHint();
         state.tab = "profile";
         $all(".cabinet-tab", el.root).forEach((btn) => {
             btn.classList.toggle("is-active", btn.dataset.tab === "profile");
