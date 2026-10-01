@@ -1322,6 +1322,63 @@
     }
 
     /* —— Shop —— */
+    let pendingShop = null;
+
+    function payEls() {
+        return {
+            overlay: document.getElementById("cabPayOverlay"),
+            close: document.getElementById("cabPayClose"),
+            backdrop: document.getElementById("cabPayBackdrop"),
+            email: document.getElementById("cabShopEmail"),
+            btn: document.getElementById("cabPayBtn"),
+            amount: document.getElementById("cabPayAmount"),
+            err: document.getElementById("cabPayError")
+        };
+    }
+
+    function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    }
+
+    function payError(text) {
+        const p = payEls();
+        if (p.err) {
+            p.err.hidden = !text;
+            p.err.textContent = text || "";
+        }
+    }
+
+    function updatePayBtn() {
+        const p = payEls();
+        if (p.btn) p.btn.disabled = !isValidEmail((p.email && p.email.value || "").trim());
+    }
+
+    function openPayOverlay(amountRub) {
+        const p = payEls();
+        if (!p.overlay) return;
+        if (p.amount) p.amount.textContent = (amountRub || 0) + " ₽";
+        if (p.email) p.email.value = "";
+        payError("");
+        updatePayBtn();
+        p.overlay.hidden = false;
+        p.overlay.setAttribute("aria-hidden", "false");
+        p.overlay.classList.add("is-open");
+        if (p.email) setTimeout(() => p.email.focus(), 60);
+    }
+
+    function closePayOverlay() {
+        const p = payEls();
+        if (p.overlay) {
+            p.overlay.classList.remove("is-open");
+            p.overlay.hidden = true;
+            p.overlay.setAttribute("aria-hidden", "true");
+        }
+        pendingShop = null;
+        payError("");
+        shopMsg("");
+        calculateShop();
+    }
+
     function shopEls() {
         return {
             form: document.getElementById("cabPaymentForm"),
@@ -1554,7 +1611,33 @@
         const token = getAccountToken();
         if (token) headers.Authorization = "Game " + token;
 
-        s.buy.disabled = true;
+        // Итог для чека (в рублях) — считаем так же, как в calculateShop.
+        const passwordCostRub = password ? 150 : 0;
+        const invisibleCostRub = s.inv.checked ? 500 : 0;
+        const rotationCostRub = s.rot.checked ? 500 : 0;
+        let skinCostRub = 0;
+        if (processedFile) {
+            skinCostRub = processedFile.type === "image/gif" ? 4500 : 150;
+        }
+        const totalRub = (passwordCostRub + skinCostRub + invisibleCostRub + rotationCostRub) * mult;
+
+        pendingShop = { formData, headers };
+        openPayOverlay(totalRub);
+    }
+
+    async function payShop() {
+        const p = payEls();
+        const email = (p.email && p.email.value || "").trim();
+        if (!isValidEmail(email)) {
+            payError("Введите корректный email для чека.");
+            if (p.email) p.email.focus();
+            return;
+        }
+        if (!pendingShop) return;
+        const { formData, headers } = pendingShop;
+        formData.set("email", email);
+
+        if (p.btn) p.btn.disabled = true;
         shopMsg("Создаём платёж…", true);
         try {
             const res = await fetch("https://api.agar.su/create-payment", {
@@ -1564,7 +1647,8 @@
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                shopMsg(data.error || data.message || ("Ошибка " + res.status));
+                payError(data.error || data.message || ("Ошибка " + res.status));
+                if (p.btn) p.btn.disabled = false;
                 calculateShop();
                 return;
             }
@@ -1576,11 +1660,12 @@
                 window.location.href = redirect;
                 return;
             }
+            closePayOverlay();
             shopMsg(data.message || "Платёж создан.", true);
         } catch (err) {
-            shopMsg("Сеть: не удалось создать платёж.");
+            payError("Сеть: не удалось создать платёж.");
+            if (p.btn) p.btn.disabled = false;
         }
-        calculateShop();
     }
 
     function bindShop() {
@@ -1621,6 +1706,21 @@
         });
         s.form.addEventListener("submit", submitShop);
         if (s.buy) s.buy.addEventListener("click", submitShop);
+        const p = payEls();
+        if (p.overlay) {
+            if (p.email) {
+                p.email.addEventListener("input", updatePayBtn);
+                p.email.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        payShop();
+                    }
+                });
+            }
+            if (p.btn) p.btn.addEventListener("click", payShop);
+            if (p.close) p.close.addEventListener("click", closePayOverlay);
+            if (p.backdrop) p.backdrop.addEventListener("click", closePayOverlay);
+        }
         calculateShop();
     }
 
