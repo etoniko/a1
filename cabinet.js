@@ -59,6 +59,7 @@
 
     let registerToken = null;
     let recoverToken = null;
+    let recoverNeedsEmail = false;
     let providers = null;
     let googleInited = false;
     let regTimerId = null;
@@ -232,8 +233,36 @@
         try { recoverToken = sessionStorage.getItem("lk_recover_token"); } catch (_) {}
         return recoverToken;
     }
-    function openRecoverPassword(token) {
+    function ensureBindFields() {
+        const step = auth$("authRecStepPass");
+        if (!step || auth$("authRecBindEmail")) return;
+        const email = document.createElement("input");
+        email.className = "cab-auth-input";
+        email.id = "authRecBindEmail";
+        email.type = "email";
+        email.maxLength = 190;
+        email.placeholder = "Почта для привязки";
+        email.autocomplete = "email";
+        const code = document.createElement("input");
+        code.className = "cab-auth-input";
+        code.id = "authRecBindCode";
+        code.type = "text";
+        code.inputMode = "numeric";
+        code.maxLength = 5;
+        code.placeholder = "Код из письма";
+        code.hidden = true;
+        const pass = auth$("authRecPass");
+        if (pass) {
+            step.insertBefore(email, pass);
+            step.insertBefore(code, pass);
+        } else {
+            step.prepend(code);
+            step.prepend(email);
+        }
+    }
+    function openRecoverPassword(token, needsEmail) {
         if (!token) return;
+        recoverNeedsEmail = !!needsEmail;
         const login = auth$("authCardLogin");
         const reg = auth$("authCardRegister");
         const rec = auth$("authCardRecover");
@@ -242,7 +271,20 @@
         if (rec) rec.hidden = false;
         persistRecoverToken(token);
         clearRecErr();
-        showRecOnly("authRecStepPass", "Придумайте новый пароль");
+        ensureBindFields();
+        const email = auth$("authRecBindEmail");
+        const code = auth$("authRecBindCode");
+        if (email) {
+            email.hidden = !recoverNeedsEmail;
+            if (!recoverNeedsEmail) email.value = "";
+        }
+        if (code) {
+            code.hidden = true;
+            code.value = "";
+        }
+        const btn = auth$("authRecSetPassBtn");
+        if (btn) btn.textContent = recoverNeedsEmail ? "Привязать почту" : "Сохранить";
+        showRecOnly("authRecStepPass", recoverNeedsEmail ? "Почта для привязки и пароль" : "Придумайте новый пароль");
     }
 
     async function authApi(path, body, timeoutMs) {
@@ -419,7 +461,7 @@
                 return;
             }
             stopAuthTimer("rec");
-            openRecoverPassword(data.recoverToken);
+            openRecoverPassword(data.recoverToken, !!data.needs_email);
         } catch (_) {
             setAuthErr(err, "Ошибка сети");
         }
@@ -428,24 +470,59 @@
     async function recSetPass() {
         const pass = auth$("authRecPass") && auth$("authRecPass").value || "";
         const token = loadRecoverToken();
+        const hint = auth$("authRecHint");
         if (!token) {
-            const hint = auth$("authRecHint");
             if (hint) hint.textContent = "Сессия сброшена. Выберите способ заново.";
             resetRecover();
             return;
         }
         if (!PASS_RE.test(pass)) {
-            const hint = auth$("authRecHint");
             if (hint) hint.textContent = "Пароль: латиница, цифры и точка, 4–64";
             return;
         }
         try {
+            if (recoverNeedsEmail) {
+                const email = (auth$("authRecBindEmail") && auth$("authRecBindEmail").value || "").trim();
+                const code = (auth$("authRecBindCode") && auth$("authRecBindCode").value || "").trim();
+                if (!email) {
+                    if (hint) hint.textContent = "Введите почту";
+                    return;
+                }
+                if (!code) {
+                    const { res, data } = await authApi("/auth/recover/bind-email/send-code", {
+                        recoverToken: token,
+                        email
+                    });
+                    if (!res.ok || data.error) {
+                        if (hint) hint.textContent = data.error || "Не удалось отправить код";
+                        return;
+                    }
+                    const codeEl = auth$("authRecBindCode");
+                    if (codeEl) codeEl.hidden = false;
+                    if (hint) hint.textContent = "Код отправлен на почту";
+                    return;
+                }
+                const { res, data } = await authApi("/auth/recover/bind-email/confirm", {
+                    recoverToken: token,
+                    email,
+                    code,
+                    pass
+                });
+                if (!res.ok || data.error || !data.token) {
+                    if (hint) hint.textContent = data.error || "Не удалось привязать";
+                    return;
+                }
+                persistRecoverToken(null);
+                recoverNeedsEmail = false;
+                alert("Почта привязана. ID ЛК: " + data.uid);
+                await finishLogin(data.token);
+                return;
+            }
             const { res, data } = await authApi("/auth/recover/set-password", {
                 recoverToken: token,
                 pass
             });
             if (!res.ok || data.error || !data.token) {
-                const hint = auth$("authRecHint");
                 if (hint) hint.textContent = data.error || "Не удалось сохранить";
                 return;
             }
@@ -453,7 +530,6 @@
             alert("Пароль сохранён. ID ЛК: " + data.uid);
             await finishLogin(data.token);
         } catch (_) {
-            const hint = auth$("authRecHint");
             if (hint) hint.textContent = "Ошибка сети";
         }
     }
@@ -469,7 +545,7 @@
                 setAuthErr(auth$("authRecError"), data.error || "В ЛК нет связанного аккаунта");
                 return;
             }
-            openRecoverPassword(data.recoverToken);
+            openRecoverPassword(data.recoverToken, true);
         } catch (_) {
             resetRecover();
             setAuthErr(auth$("authRecError"), "Ошибка сети");
@@ -899,6 +975,65 @@
         if (el.authAvatar && state.accountAvatar) el.authAvatar.src = state.accountAvatar;
     }
 
+
+    function showCabEmailBind(data, token) {
+        const existing = document.getElementById("lkEmailBind");
+        if (!data || !data.needs_email) {
+            if (existing) existing.remove();
+            return;
+        }
+        if (existing) return;
+        const box = document.createElement("div");
+        box.id = "lkEmailBind";
+        box.setAttribute("style", "position:fixed;top:12px;right:12px;z-index:100000;width:280px;max-width:calc(100vw - 24px);background:#141824;color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);font:13px/1.35 Arial,sans-serif");
+        box.innerHTML = '<div style="font-weight:700;margin-bottom:6px">Привяжите почту</div><div style="opacity:.8;margin-bottom:8px">VK, Telegram и Google больше не используются для входа. Подтвердите почту кодом и задайте пароль.</div><input id="lkBindEmail" type="email" maxlength="190" placeholder="email@mail.ru" style="width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px;border-radius:8px;border:1px solid #333;background:#0e1118;color:#fff"><input id="lkBindCode" type="text" inputmode="numeric" maxlength="5" placeholder="Код из письма" hidden style="width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px;border-radius:8px;border:1px solid #333;background:#0e1118;color:#fff"><input id="lkBindPass" type="text" maxlength="64" placeholder="Пароль: a-z A-Z 0-9 ." autocomplete="off" style="width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px;border-radius:8px;border:1px solid #333;background:#0e1118;color:#fff"><div id="lkBindErr" style="color:#ff8d8d;min-height:16px"></div><button id="lkBindSend" type="button" style="width:100%;padding:8px;border:0;border-radius:8px;background:#3d7eff;color:#fff;font-weight:700;cursor:pointer">Отправить код</button>';
+        document.body.appendChild(box);
+        const err = box.querySelector("#lkBindErr");
+        const sendBtn = box.querySelector("#lkBindSend");
+        sendBtn.onclick = async () => {
+            const email = box.querySelector("#lkBindEmail").value.trim();
+            const pass = box.querySelector("#lkBindPass").value;
+            const codeEl = box.querySelector("#lkBindCode");
+            const code = codeEl.value.trim();
+            err.textContent = "";
+            if (!/^[0-9a-zA-Z.]{4,64}$/.test(pass)) {
+                err.textContent = "Пароль: латиница, цифры и точка, 4–64";
+                return;
+            }
+            sendBtn.disabled = true;
+            try {
+                const path = code ? "/api/auth/bind-email/confirm" : "/api/auth/bind-email/send-code";
+                const body = code ? { email, code, pass } : { email };
+                const res = await fetch("https://api.agar.su" + path, {
+                    method: "POST",
+                    headers: {
+                        Authorization: "Game " + token,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(body)
+                });
+                const payload = await res.json().catch(() => ({}));
+                if (!res.ok || payload.error || (code && !payload.token)) {
+                    err.textContent = payload.error || "Не удалось привязать";
+                    return;
+                }
+                if (!code) {
+                    codeEl.hidden = false;
+                    sendBtn.textContent = "Привязать";
+                    err.textContent = "Код отправлен на почту";
+                    return;
+                }
+                setAccountToken(payload.token);
+                box.remove();
+                await loadAccountProfile();
+            } catch (_) {
+                err.textContent = "Ошибка сети";
+            } finally {
+                sendBtn.disabled = false;
+            }
+        };
+    }
+
     async function loadAccountProfile() {
         const token = getAccountToken();
         if (!token) {
@@ -935,6 +1070,7 @@
             state.uid = data.uid != null ? data.uid : null;
             if (data.xp != null) updateXpUi(data.xp);
             else updateAuthUi();
+            showCabEmailBind(data, token);
             await loadMyNicknames(true);
         } catch (e) {
             updateAuthUi();
@@ -943,6 +1079,8 @@
     }
 
     function logoutAccount() {
+        const bindBox = document.getElementById("lkEmailBind");
+        if (bindBox) bindBox.remove();
         setAccountToken("");
         state.accountName = null;
         state.accountAvatar = null;
