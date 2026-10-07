@@ -60,6 +60,9 @@
     let registerToken = null;
     let recoverToken = null;
     let recoverNeedsEmail = false;
+    let recoverHasPass = false;
+    let recoverPhase = "pass";
+    let recoverNewPass = "";
     let providers = null;
     let googleInited = false;
     let regTimerId = null;
@@ -250,6 +253,7 @@
         code.inputMode = "numeric";
         code.maxLength = 5;
         code.placeholder = "Код из письма";
+        code.autocomplete = "one-time-code";
         code.hidden = true;
         const pass = auth$("authRecPass");
         let anchor = pass;
@@ -262,9 +266,19 @@
             step.prepend(email);
         }
     }
+    function showPassField(show) {
+        const pass = auth$("authRecPass");
+        if (pass) {
+            pass.hidden = !show;
+            if (!show) pass.value = "";
+        }
+    }
+
     function openRecoverPassword(token, needsEmail) {
         if (!token) return;
         recoverNeedsEmail = !!needsEmail;
+        recoverPhase = "pass";
+        recoverNewPass = "";
         const login = auth$("authCardLogin");
         const reg = auth$("authCardRegister");
         const rec = auth$("authCardRecover");
@@ -277,16 +291,17 @@
         const email = auth$("authRecBindEmail");
         const code = auth$("authRecBindCode");
         if (email) {
-            email.hidden = !recoverNeedsEmail;
-            if (!recoverNeedsEmail) email.value = "";
+            email.hidden = true;
+            email.value = "";
         }
         if (code) {
             code.hidden = true;
             code.value = "";
         }
+        showPassField(true);
         const btn = auth$("authRecSetPassBtn");
-        if (btn) btn.textContent = recoverNeedsEmail ? "Привязать почту" : "Сохранить";
-        showRecOnly("authRecStepPass", recoverNeedsEmail ? "Почта для привязки и пароль" : "Придумайте новый пароль");
+        if (btn) btn.textContent = recoverNeedsEmail ? "Дальше" : "Сохранить";
+        showRecOnly("authRecStepPass", "Придумайте новый пароль");
     }
 
     async function authApi(path, body, timeoutMs) {
@@ -463,7 +478,7 @@
                 return;
             }
             stopAuthTimer("rec");
-            openRecoverPassword(data.recoverToken, !!data.needs_email);
+            openRecoverPassword(data.recoverToken, !!data.needs_email, !!data.has_pass);
         } catch (_) {
             setAuthErr(err, "Ошибка сети");
         }
@@ -478,37 +493,41 @@
             resetRecover();
             return;
         }
-        if (!PASS_RE.test(pass)) {
-            if (hint) hint.textContent = "Пароль: латиница, цифры и точка, 4–64";
-            return;
-        }
         try {
-            if (recoverNeedsEmail) {
+            if (recoverNeedsEmail && recoverPhase === "mail") {
                 const email = (auth$("authRecBindEmail") && auth$("authRecBindEmail").value || "").trim();
-                const code = (auth$("authRecBindCode") && auth$("authRecBindCode").value || "").trim();
+                const code = ((auth$("authRecBindCode") && auth$("authRecBindCode").value || "").trim().replace(/\D/g, ""));
                 if (!email) {
                     if (hint) hint.textContent = "Введите почту";
                     return;
                 }
-                if (!code) {
-                    const { res, data } = await authApi("/auth/recover/bind-email/send-code", {
-                        recoverToken: token,
-                        email
-                    });
-                    if (!res.ok || data.error) {
-                        if (hint) hint.textContent = data.error || "Не удалось отправить код";
+                if (!/^\d{5}$/.test(code)) {
+                    if (!code) {
+                        const { res, data } = await authApi("/auth/recover/bind-email/send-code", {
+                            recoverToken: token,
+                            email
+                        });
+                        if (!res.ok || data.error) {
+                            if (hint) hint.textContent = data.error || "Не удалось отправить код";
+                            return;
+                        }
+                        const codeEl = auth$("authRecBindCode");
+                        if (codeEl) {
+                            codeEl.hidden = false;
+                            codeEl.focus();
+                        }
+                        const btn = auth$("authRecSetPassBtn");
+                        if (btn) btn.textContent = "Подтвердить";
+                        if (hint) hint.textContent = "Код отправлен на почту";
                         return;
                     }
-                    const codeEl = auth$("authRecBindCode");
-                    if (codeEl) codeEl.hidden = false;
-                    if (hint) hint.textContent = "Код отправлен на почту";
+                    if (hint) hint.textContent = "Введите 5-значный код из письма";
                     return;
                 }
                 const { res, data } = await authApi("/auth/recover/bind-email/confirm", {
                     recoverToken: token,
                     email,
-                    code,
-                    pass
+                    code
                 });
                 if (!res.ok || data.error || !data.token) {
                     if (hint) hint.textContent = data.error || "Не удалось привязать";
@@ -520,12 +539,36 @@
                 await finishLogin(data.token);
                 return;
             }
+            if (!PASS_RE.test(pass)) {
+                if (hint) hint.textContent = "Пароль: латиница, цифры и точка, 4–64";
+                return;
+            }
             const { res, data } = await authApi("/auth/recover/set-password", {
                 recoverToken: token,
                 pass
             });
             if (!res.ok || data.error || !data.token) {
                 if (hint) hint.textContent = data.error || "Не удалось сохранить";
+                return;
+            }
+            if (data.needs_email) {
+                recoverNewPass = pass;
+                recoverNeedsEmail = true;
+                recoverPhase = "mail";
+                showPassField(false);
+                const emailEl = auth$("authRecBindEmail");
+                if (emailEl) {
+                    emailEl.hidden = false;
+                    emailEl.focus();
+                }
+                const codeEl = auth$("authRecBindCode");
+                if (codeEl) {
+                    codeEl.hidden = true;
+                    codeEl.value = "";
+                }
+                const btn = auth$("authRecSetPassBtn");
+                if (btn) btn.textContent = "Отправить код";
+                if (hint) hint.textContent = "Укажите почту, затем код из письма";
                 return;
             }
             persistRecoverToken(null);
@@ -547,7 +590,7 @@
                 setAuthErr(auth$("authRecError"), data.error || "В ЛК нет связанного аккаунта");
                 return;
             }
-            openRecoverPassword(data.recoverToken, true);
+            openRecoverPassword(data.recoverToken, data.needs_email !== false, !!data.has_pass);
         } catch (_) {
             resetRecover();
             setAuthErr(auth$("authRecError"), "Ошибка сети");
