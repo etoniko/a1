@@ -252,9 +252,11 @@
         code.placeholder = "Код из письма";
         code.hidden = true;
         const pass = auth$("authRecPass");
-        if (pass) {
-            step.insertBefore(email, pass);
-            step.insertBefore(code, pass);
+        let anchor = pass;
+        if (anchor && anchor.parentElement !== step) anchor = anchor.parentElement;
+        if (anchor && anchor.parentElement === step) {
+            step.insertBefore(email, anchor);
+            step.insertBefore(code, anchor);
         } else {
             step.prepend(code);
             step.prepend(email);
