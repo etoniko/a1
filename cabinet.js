@@ -989,7 +989,7 @@
         const box = document.createElement("div");
         box.id = "lkEmailBind";
         box.setAttribute("style", "position:fixed;top:12px;right:12px;z-index:100000;width:280px;max-width:calc(100vw - 24px);background:#141824;color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);font:13px/1.35 Arial,sans-serif");
-        box.innerHTML = '<div style="font-weight:700;margin-bottom:6px">Привяжите почту</div><div style="opacity:.8;margin-bottom:8px">VK, Telegram и Google больше не используются для входа. Подтвердите почту кодом и задайте пароль.</div><input id="lkBindEmail" type="email" maxlength="190" placeholder="email@mail.ru" style="width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px;border-radius:8px;border:1px solid #333;background:#0e1118;color:#fff"><input id="lkBindCode" type="text" inputmode="numeric" maxlength="5" placeholder="Код из письма" style="width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px;border-radius:8px;border:1px solid #333;background:#0e1118;color:#fff"><input id="lkBindPass" type="text" maxlength="64" placeholder="Пароль: a-z A-Z 0-9 ." autocomplete="off" style="width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px;border-radius:8px;border:1px solid #333;background:#0e1118;color:#fff"><div id="lkBindErr" style="color:#ff8d8d;min-height:16px"></div><button id="lkBindSend" type="button" style="width:100%;padding:8px;border:0;border-radius:8px;background:#3d7eff;color:#fff;font-weight:700;cursor:pointer">Отправить код</button>';
+        box.innerHTML = '<div style="font-weight:700;margin-bottom:6px">Привяжите почту</div><div style="opacity:.8;margin-bottom:8px">VK, Telegram и Google больше не используются для входа. Сначала укажите почту, затем код из письма. Пароль аккаунта остаётся прежним.</div><input id="lkBindEmail" type="email" maxlength="190" placeholder="email@mail.ru" style="width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px;border-radius:8px;border:1px solid #333;background:#0e1118;color:#fff"><input id="lkBindCode" type="text" inputmode="numeric" maxlength="5" placeholder="Код из письма" hidden style="width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px;border-radius:8px;border:1px solid #333;background:#0e1118;color:#fff"><div id="lkBindErr" style="color:#ff8d8d;min-height:16px"></div><button id="lkBindSend" type="button" style="width:100%;padding:8px;border:0;border-radius:8px;background:#3d7eff;color:#fff;font-weight:700;cursor:pointer">Отправить код</button>';
         document.body.appendChild(box);
         try {
           const draft = sessionStorage.getItem("lkBindDraft") || "";
@@ -998,20 +998,22 @@
         } catch (e) {}
         const err = box.querySelector("#lkBindErr");
         const sendBtn = box.querySelector("#lkBindSend");
+        try {
+          if (sessionStorage.getItem("lkBindDraft")) {
+            const codeEl = box.querySelector("#lkBindCode");
+            if (codeEl) codeEl.hidden = false;
+            sendBtn.textContent = "Подтвердить";
+          }
+        } catch (e) {}
         sendBtn.onclick = async () => {
             const email = box.querySelector("#lkBindEmail").value.trim();
-            const pass = box.querySelector("#lkBindPass").value;
             const codeEl = box.querySelector("#lkBindCode");
             const code = codeEl.value.trim();
             err.textContent = "";
-            if (!/^[0-9a-zA-Z.]{4,64}$/.test(pass)) {
-                err.textContent = "Пароль: латиница, цифры и точка, 4–64";
-                return;
-            }
             sendBtn.disabled = true;
             try {
                 const path = code ? "/api/auth/bind-email/confirm" : "/api/auth/bind-email/send-code";
-                const body = code ? { email, code, pass } : { email };
+                const body = code ? { email, code } : { email };
                 const res = await fetch("https://api.agar.su" + path, {
                     method: "POST",
                     headers: {
@@ -1027,7 +1029,7 @@
                 }
                 if (!code) {
                     codeEl.hidden = false;
-                    sendBtn.textContent = "Привязать";
+                    sendBtn.textContent = "Подтвердить";
                     err.textContent = "Код отправлен на почту";
                     try { sessionStorage.setItem("lkBindDraft", email); } catch (e) {}
                     return;
