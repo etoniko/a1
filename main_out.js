@@ -101,7 +101,7 @@ function getGameServerApiBase(hostOrUrl) {
     if (!hostOrUrl) return "https://ffa.agar.su";
     if (/^https?:\/\//i.test(hostOrUrl)) return String(hostOrUrl).replace(/\/$/, "");
     
-    // Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР° РґР»СЏ ffa.agar.su
+    // Дополнительная проверка для ffa.agar.su
     if (hostOrUrl === "ffa.agar.su") return "https://ffa.agar.su";
     
     const proto = location.protocol === "https:" ? "https://" : "http://";
@@ -168,21 +168,21 @@ function updateConnectTransferStream(inputPreview, hashHex) {
     const stream = document.getElementById("connect-verify-data-stream");
     if (!stream) return;
     const raw = String(inputPreview);
-    const tail = raw.length > 18 ? "вЂ¦" + raw.slice(-14) : raw;
+    const tail = raw.length > 18 ? "…" + raw.slice(-14) : raw;
     const h = String(hashHex || "");
-    stream.textContent = 'sha256("' + tail + '") в†’ ' + h.slice(0, 12) + "вЂ¦";
+    stream.textContent = 'sha256("' + tail + '") → ' + h.slice(0, 12) + "…";
 }
 
 function resetConnectVerifyStream() {
     const stream = document.getElementById("connect-verify-data-stream");
-    if (stream) stream.textContent = 'sha256("вЂ¦") в†’ вЂ¦';
+    if (stream) stream.textContent = 'sha256("…") → …';
 }
 
 function solveConnectChallenge(challenge) {
     const need = "0".repeat(challenge.difficulty);
     const prefix = challenge.prefix;
     let nonce = 0;
-    setConnectingUI("РџРљ РѕР±РјРµРЅРёРІР°РµС‚СЃСЏ РґР°РЅРЅС‹РјРё СЃ СЃРµСЂРІРµСЂРѕРјвЂ¦", 35);
+    setConnectingUI("ПК обменивается данными с сервером…", 35);
 
     return new Promise((resolve) => {
         function step() {
@@ -197,7 +197,7 @@ function solveConnectChallenge(challenge) {
                 }
                 nonce++;
                 if (nonce % 1500 === 0) {
-                    setConnectingUI("РџСЂРѕРІРµСЂРєР° Р±РµР·РѕРїР°СЃРЅРѕСЃС‚РёвЂ¦", 55);
+                    setConnectingUI("Проверка безопасности…", 55);
                     updateConnectTransferStream(input, hash);
                 }
             }
@@ -215,7 +215,7 @@ async function fetchConnectToken(gameHost) {
     }
 
     setConnectingUI(
-        serverPowSupportCache.get(apiBase) === true ? "Р—Р°РїСЂРѕСЃ РїСЂРѕРІРµСЂРєРёвЂ¦" : "РџСЂРѕРІРµСЂРєР° СЃРµСЂРІРµСЂР°вЂ¦",
+        serverPowSupportCache.get(apiBase) === true ? "Запрос проверки…" : "Проверка сервера…",
         15
     );
 
@@ -245,10 +245,10 @@ async function fetchConnectToken(gameHost) {
     }
 
     serverPowSupportCache.set(apiBase, true);
-    setConnectingUI("РџСЂРѕРІРµСЂРєР° Р±РµР·РѕРїР°СЃРЅРѕСЃС‚РёвЂ¦", 25);
+    setConnectingUI("Проверка безопасности…", 25);
     resetConnectVerifyStream();
     const token = await solveConnectChallenge(challenge);
-    setConnectingUI("РџРѕРґРєР»СЋС‡РµРЅРёРµ Рє СЃРµСЂРІРµСЂСѓвЂ¦", 75);
+    setConnectingUI("Подключение к серверу…", 75);
     return token;
 }
 
@@ -330,7 +330,7 @@ class Vector2 {
 
 class Game {
     constructor() {
-        // РЎРѕРµРґРёРЅРµРЅРёРµ
+        // Соединение
         this.CONNECTION_URL = "";
         this.currentWebSocketUrl = null;
         this.ws = null;
@@ -344,7 +344,7 @@ class Game {
         this.disconnectedVisible = false;
         this.showMenuBackground = true;
         this.useHttps = location.protocol === "https:";
-        // Canvas Рё РѕС‚СЂРёСЃРѕРІРєР°
+        // Canvas и отрисовка
         this.canvas = null;
         this.ctx = null;
         this.canvasWidth = 0;
@@ -357,7 +357,7 @@ class Game {
         this.posX = 0;
         this.posY = 0;
         this.posSize = 1;
-        // Р“СЂР°РЅРёС†С‹ РєР°СЂС‚С‹
+        // Границы карты
         this.leftPos = 0;
         this.topPos = 0;
         this.rightPos = 0;
@@ -365,13 +365,13 @@ class Game {
         this.foodMinSize = 0;
         this.foodMaxSize = 0;
         this.ownerPlayerId = -1;
-        // РРіСЂРѕРє Рё РєР»РµС‚РєРё
+        // Игрок и клетки
         this.playerCells = [];
         this.nodes = {};
         this.nodelist = [];
-        this.Cells = []; // СѓРЅРёС‡С‚РѕР¶РµРЅРЅС‹Рµ РєР»РµС‚РєРё (Р°РЅРёРјР°С†РёСЏ)
+        this.Cells = []; // уничтоженные клетки (анимация)
         this.nodesOnScreen = [];
-        // РРЅС‚РµСЂС„РµР№СЃ Рё HUD
+        // Интерфейс и HUD
         this.leaderBoard = [];
         this.chatBoard = [];
         this.lbCanvas = null;
@@ -386,15 +386,15 @@ class Game {
         this.userNickName = null;
 		this.skinMap = {};     // nick -> codeid
         this.skinCache = {};   // codeid -> Image
-        this.skinLoading = {}; // С‡С‚РѕР±С‹ РЅРµ РіСЂСѓР·РёС‚СЊ 100 СЂР°Р·
+        this.skinLoading = {}; // чтобы не грузить 100 раз
         this.hideChat = false;
         this.showDarkTheme = false;
         this.showName = true;
         this.showSkin = true;
         this.showMass = true;
-		this.interpSpeed = 120; // СЃРєРѕСЂРѕСЃС‚СЊ РёРЅС‚РµСЂРїРѕР»СЏС†РёРё (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ СЃРµСЂРµРґРёРЅР°)
+		this.interpSpeed = 120; // скорость интерполяции (по умолчанию середина)
         this.noRanking = false;
-        // РњС‹С€СЊ Рё РІРІРѕРґ
+        // Мышь и ввод
         this.rawMouseX = 0;
         this.rawMouseY = 0;
         this.X = -1;
@@ -423,12 +423,12 @@ class Game {
         this.splitIcon.src = "https://api.agar.su/photo/split.png";
         this.ejectIcon.src = "https://api.agar.su/photo/eject.png";
         this.timestamp = 0;
-        // РЈРїСЂР°РІР»РµРЅРёРµ
+        // Управление
         this.isTyping = false;
         this.spacePressed = false;
         this.wPressed = false;
         this.hasOverlay = true;
-        //РїСЂРѕС‡РµРµ
+        //прочее
         this.z = 1;
         this.qTree = null;
         this.cellColors = [];
@@ -476,18 +476,18 @@ class Game {
 
     let n = nick.trim();
 
-    // РџСЂРѕРІРµСЂСЏРµРј, РЅР°С‡РёРЅР°РµС‚СЃСЏ Р»Рё РЅРёРє СЃ РѕС‚РєСЂС‹РІР°СЋС‰РµР№СЃСЏ СЃРєРѕР±РєРё
+    // Проверяем, начинается ли ник с открывающейся скобки
     if (n.startsWith('[')) {
         const endIndex = n.indexOf(']');
-        if (endIndex === -1) return ''; // Р·Р°РєСЂС‹РІР°СЋС‰РµР№ СЃРєРѕР±РєРё РЅРµС‚
+        if (endIndex === -1) return ''; // закрывающей скобки нет
 
         const innerNick = n.substring(1, endIndex).trim();
-        if (!innerNick || innerNick !== n.substring(1, endIndex)) return ''; // РїСЂРѕРІРµСЂРєР° РїСЂРѕР±РµР»РѕРІ РІРЅСѓС‚СЂРё
+        if (!innerNick || innerNick !== n.substring(1, endIndex)) return ''; // проверка пробелов внутри
 
-        // Р’РѕР·РІСЂР°С‰Р°РµРј РЅРёРє РІРјРµСЃС‚Рµ СЃРѕ СЃРєРѕР±РєР°РјРё, РёРіРЅРѕСЂРёСЂСѓСЏ РІСЃС‘ РїРѕСЃР»Рµ Р·Р°РєСЂС‹РІР°СЋС‰РµР№СЃСЏ СЃРєРѕР±РєРё
+        // Возвращаем ник вместе со скобками, игнорируя всё после закрывающейся скобки
         return `[${innerNick}]`.toLowerCase();
     } else {
-        // РќРёРє Р±РµР· СЃРєРѕР±РѕРє: РЅРµР»СЊР·СЏ СЃРѕРґРµСЂР¶Р°С‚СЊ РїСЂРѕР±РµР»С‹ РІ РЅР°С‡Р°Р»Рµ/РєРѕРЅС†Рµ
+        // Ник без скобок: нельзя содержать пробелы в начале/конце
         if (!n || n.trim() !== n) return '';
         return n.toLowerCase();
     }
@@ -597,7 +597,7 @@ setSpect() {
             this.connectShown = true;
             this.hideDisconnected();
             document.querySelector("#connecting").style.display = "block";
-            setConnectingUI("РџРѕРґРєР»СЋС‡РµРЅРёРµ Рє СЃРµСЂРІРµСЂСѓвЂ¦", 5);
+            setConnectingUI("Подключение к серверу…", 5);
             this.showConnecting();
         }
     }
@@ -612,7 +612,7 @@ setSpect() {
             this.connectShown = true;
             this.hideDisconnected();
             document.querySelector("#connecting").style.display = "block";
-            setConnectingUI("РџРѕРґРєР»СЋС‡РµРЅРёРµ Рє СЃРµСЂРІРµСЂСѓвЂ¦", 5);
+            setConnectingUI("Подключение к серверу…", 5);
             this.showConnecting();
         }
     }
@@ -1009,7 +1009,7 @@ setSpect() {
         if (this.connectInProgress) return;
         this.hideDisconnected();
         document.querySelector("#connecting").style.display = "block";
-        setConnectingUI("РџРѕРґРєР»СЋС‡РµРЅРёРµ Рє СЃРµСЂРІРµСЂСѓвЂ¦", 5);
+        setConnectingUI("Подключение к серверу…", 5);
         this.showConnecting();
     }
     scheduleTabHiddenClose() {
@@ -1105,7 +1105,7 @@ setSpect() {
     async _wsConnectImpl(wsUrlArg) {
         if (this.connectInProgress) return;
         this.connectInProgress = true;
-        setConnectingUI("РџРѕРґРєР»СЋС‡РµРЅРёРµ Рє СЃРµСЂРІРµСЂСѓвЂ¦", 5);
+        setConnectingUI("Подключение к серверу…", 5);
         document.querySelector("#connecting").style.display = "block";
 
         await this.closeWsForReconnect();
@@ -1120,7 +1120,7 @@ setSpect() {
         } catch (err) {
             console.error("Connect token error:", err);
             this.connectInProgress = false;
-            setConnectingUI("РћС€РёР±РєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ", 5);
+            setConnectingUI("Ошибка подключения", 5);
             return;
         }
 
@@ -1148,7 +1148,7 @@ setSpect() {
         };
         ws.onerror = () => {
             if (this.ws !== ws) return;
-            setConnectingUI("РЎРµСЂРІРµСЂ РѕС‚РєР»РѕРЅРёР» РїРѕРґРєР»СЋС‡РµРЅРёРµ (Р»РёРјРёС‚ IP РёР»Рё РїСЂРѕРІРµСЂРєР°)", 5);
+            setConnectingUI("Сервер отклонил подключение (лимит IP или проверка)", 5);
         };
         this.connectInProgress = false;
     }
@@ -1183,7 +1183,7 @@ setSpect() {
         this.sendAccountToken();
         this.joinCurrentServer();
         console.info("Connection successful!");
-        setTimeout(() => { this.sendChat("РІРѕС€С‘Р» РІ РёРіСЂСѓ!"); }, 1000);
+        setTimeout(() => { this.sendChat("вошёл в игру!"); }, 1000);
     }
     sendAccountToken() {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -1559,28 +1559,28 @@ setSpect() {
         1 < this.z && (this.z = 1);
     }
  drawGrid() {
-    // 1. Р—Р°Р»РёРІР°РµРј С„РѕРЅ РїРѕР»РЅРѕСЃС‚СЊСЋ (СЌС‚Рѕ РЅРµ Р·Р°РІРёСЃРёС‚ РѕС‚ zoom/translate)
+    // 1. Заливаем фон полностью (это не зависит от zoom/translate)
     this.ctx.fillStyle = this.showDarkTheme ? "#111111" : "#F2FBFF";
     this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
 
-    // 2. РЎРѕС…СЂР°РЅСЏРµРј С‚РµРєСѓС‰РµРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+    // 2. Сохраняем текущее состояние
     this.ctx.save();
 
-    // 3. РџСЂРёРјРµРЅСЏРµРј С‚СЂР°РЅСЃС„РѕСЂРјР°С†РёРё РґР»СЏ РІСЃРµР№ СЃРµС‚РєРё
+    // 3. Применяем трансформации для всей сетки
     this.ctx.scale(this.viewZoom, this.viewZoom);
-    // Р•СЃР»Рё Сѓ С‚РµР±СЏ РµСЃС‚СЊ СЃРјРµС‰РµРЅРёРµ РєР°РјРµСЂС‹ вЂ” РґРѕР±Р°РІСЊ СЃСЋРґР°:
+    // Если у тебя есть смещение камеры — добавь сюда:
     // this.ctx.translate(-this.nodeX + this.canvasWidth/2, -this.nodeY + this.canvasHeight/2);
 
-    // 4. РќР°СЃС‚СЂР°РёРІР°РµРј СЃС‚РёР»СЊ Р»РёРЅРёР№
+    // 4. Настраиваем стиль линий
     this.ctx.strokeStyle = this.showDarkTheme ? "#AAAAAA" : "#000000";
     this.ctx.globalAlpha = 0.1;
 
     const viewWidth  = this.canvasWidth  / this.viewZoom;
     const viewHeight = this.canvasHeight / this.viewZoom;
 
-    // в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-    // Р’РµСЂС‚РёРєР°Р»СЊРЅС‹Рµ Р»РёРЅРёРё
-    this.ctx.beginPath();   // в†ђ РЅР°С‡РёРЅР°РµРј РЅРѕРІС‹Р№ РїСѓС‚СЊ РўРћР›Р¬РљРћ РћР”РРќ СЂР°Р·
+    // ──────────────────────────────────────────────
+    // Вертикальные линии
+    this.ctx.beginPath();   // ← начинаем новый путь ТОЛЬКО ОДИН раз
 
     let startX = -0.5 + (-this.nodeX + viewWidth / 2) % 50;
     for (let x = startX; x < viewWidth; x += 50) {
@@ -1588,18 +1588,18 @@ setSpect() {
         this.ctx.lineTo(x, viewHeight);
     }
 
-    // в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-    // Р“РѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅС‹Рµ Р»РёРЅРёРё вЂ” РїСЂРѕРґРѕР»Р¶Р°РµРј РІ С‚РѕРј Р¶Рµ РїСѓС‚Рё
+    // ──────────────────────────────────────────────
+    // Горизонтальные линии — продолжаем в том же пути
     let startY = -0.5 + (-this.nodeY + viewHeight / 2) % 50;
     for (let y = startY; y < viewHeight; y += 50) {
         this.ctx.moveTo(0, y);
         this.ctx.lineTo(viewWidth, y);
     }
 
-    // 5. РћРґРёРЅ РІС‹Р·РѕРІ stroke РЅР° РІСЃРµ Р»РёРЅРёРё СЃСЂР°Р·Сѓ вЂ” СЌС‚Рѕ Р±С‹СЃС‚СЂРµРµ
+    // 5. Один вызов stroke на все линии сразу — это быстрее
     this.ctx.stroke();
 
-    // 6. Р’РѕР·РІСЂР°С‰Р°РµРј РєРѕРЅС‚РµРєСЃС‚ РІ РёСЃС…РѕРґРЅРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ (РѕС‡РµРЅСЊ РІР°Р¶РЅРѕ!)
+    // 6. Возвращаем контекст в исходное состояние (очень важно!)
     this.ctx.restore();
 }
     calcUserScore() {
@@ -1793,7 +1793,7 @@ setSpect() {
         const myPid = this.ownerPlayerId | 0;
         const myIds = new Set(this.playerCells.map((c) => c.id));
 
-        // 1) Stable match by my player id (pID / ownerPlayerId) вЂ” like "РјРѕР№ id"
+        // 1) Stable match by my player id (pID / ownerPlayerId) — like "мой id"
         if (myPid > 0) {
             for (let i = 0; i < this.leaderBoard.length; i++) {
                 if (this.leaderBoard[i].id === myPid) {
@@ -2231,7 +2231,7 @@ setSpect() {
         
         const name = reader.utf8();
         
-        // ========== Р§РўР•РќРР• РЎРўРРљР•Р Рђ (Р”РћР‘РђР’РРўР¬ Р­РўРћРў Р‘Р›РћРљ) ==========
+        // ========== ЧТЕНИЕ СТИКЕРА (ДОБАВИТЬ ЭТОТ БЛОК) ==========
         let stickerData = null;
         if (reader.canRead) {
             const marker = reader.uint8();
@@ -2267,7 +2267,7 @@ setSpect() {
             }
         }
         
-        // ========== РЈРЎРўРђРќРћР’РљРђ РЎРўРРљР•Р Рђ ==========
+        // ========== УСТАНОВКА СТИКЕРА ==========
         if (stickerData !== null) {
             node.currentSticker = stickerData;
             node.stickerActive = true;
@@ -2287,7 +2287,7 @@ setSpect() {
         node.flag = spiked;
         if (name) node.setName(name);
         
-        // РђРґРјРёРЅ-РїР°РЅРµР»СЊ (РµСЃР»Рё РЅСѓР¶РЅРѕ)
+        // Админ-панель (если нужно)
         if (name && playerId === this.ownerPlayerId) {
             const lowerName = name.toLowerCase().trim();
             const isAdmin = this.admins?.some(admin => lowerName.includes(admin.toLowerCase()));
@@ -2434,22 +2434,22 @@ class UText {
             const scale = this._scale;
             const fontsize = this._size;
             const font = canvasFont(fontsize);
-            // РІР°Р¶РЅРѕ: СЃРЅР°С‡Р°Р»Р° font
+            // важно: сначала font
             ctx.font = font;
             const h = ~~(0.2 * fontsize);
             const h2 = h * 0.5;
             const wd = fontsize * 0.1;
-            // resize canvas РЎР‘Р РђРЎР«Р’РђР•Рў transform
+            // resize canvas СБРАСЫВАЕТ transform
             this._canvas.width = ctx.measureText(value).width * scale + 3;
             this._canvas.height = (fontsize + h) * scale;
-            // СЃР±СЂРѕСЃ transform РІСЂСѓС‡РЅСѓСЋ (РЅР° РІСЃСЏРєРёР№ СЃР»СѓС‡Р°Р№)
+            // сброс transform вручную (на всякий случай)
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.font = font;
             ctx.globalAlpha = 1;
             ctx.lineWidth = wd;
             ctx.strokeStyle = this._strokeColor;
             ctx.fillStyle = this._color;
-            // РјР°СЃС€С‚Р°Р±РёСЂСѓРµРј РџРћРЎР›Р• РЅР°СЃС‚СЂРѕР№РєРё
+            // масштабируем ПОСЛЕ настройки
             ctx.scale(scale, scale);
             if (this._stroke) {
                 ctx.strokeText(value, 0, fontsize - h2);
