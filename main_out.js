@@ -98,11 +98,11 @@ function wrapChatMessageLines(message, prefixWidth, maxWidth, fontSize) {
 }
 
 function getGameServerApiBase(hostOrUrl) {
-    if (!hostOrUrl) return "https://ffa2.agar.su";
+    if (!hostOrUrl) return "https://ffa.agar.su";
     if (/^https?:\/\//i.test(hostOrUrl)) return String(hostOrUrl).replace(/\/$/, "");
     
-    // Дополнительная проверка для ffa2.agar.su
-    if (hostOrUrl === "ffa2.agar.su") return "https://ffa2.agar.su";
+    // Дополнительная проверка для ffa.agar.su
+    if (hostOrUrl === "ffa.agar.su") return "https://ffa.agar.su";
     
     const proto = location.protocol === "https:" ? "https://" : "http://";
     return proto + String(hostOrUrl).replace(/^wss?:\/\//i, "");
@@ -283,7 +283,7 @@ function initHelloDialogScale() {
 }
 
 const SERVERS = {
-    ffa: "ffa2.agar.su",
+    ffa: "ffa.agar.su",
     ffa1: "ffa2.agar.su:6001",
     ms: "ms.agar.su:6001",
     pvp1: "ms.agar.su:6004",
@@ -1938,6 +1938,43 @@ setSpect() {
         const FOOD_HEX = ["#ff0720", "#ff0760", "#ff07b4", "#ff4007", "#ffa007", "#ff07ff", "#07ff20", "#07ff8c", "#07ffe6", "#0740ff", "#07b4ff", "#b407ff", "#ff285a", "#28ff5a", "#ffdc07", "#07dcff"];
         return FOOD_HEX[(id | 0) & 15] || FOOD_HEX[0];
     }
+    rememberPlayerNick(playerId, name) {
+        if (!playerId || !name) return false;
+        if (!this.playerNicks) this.playerNicks = Object.create(null);
+        const pid = playerId >>> 0;
+        if (this.playerNicks[pid] === name) return false;
+        this.playerNicks[pid] = name;
+        return true;
+    }
+    nickForPlayerId(playerId) {
+        if (!playerId || !this.playerNicks) return "";
+        return this.playerNicks[playerId >>> 0] || "";
+    }
+    applyPlayerNickToCells(playerId, name) {
+        if (!this.nodelist || !playerId || !name) return;
+        const pid = playerId >>> 0;
+        for (let i = 0; i < this.nodelist.length; i++) {
+            const n = this.nodelist[i];
+            if (n && !n.isFood && (n.playerId >>> 0) === pid && n.name !== name) n.setName(name);
+        }
+    }
+    applyName(node, pid, name) {
+        if (!node) return;
+        if (pid && name) {
+            if (this.rememberPlayerNick(pid, name)) this.applyPlayerNickToCells(pid, name);
+            else if (node.name !== name) node.setName(name);
+            return;
+        }
+        if (name && node.name !== name) {
+            node.setName(name);
+            return;
+        }
+        if (pid) {
+            const known = this.nickForPlayerId(pid);
+            if (known && node.name !== known) node.setName(known);
+        }
+    }
+    
     applyThinWorld(view, offset) {
         if (!view || offset >= view.byteLength) return;
         this.timestamp = Date.now();
@@ -2163,11 +2200,11 @@ setSpect() {
                             }
                         }
                     }
-                    if (name) node.setName(name);
+                    this.applyName(node, pid, name);
                 } else if (node && !node.destroyed) {
                     retarget(node, encX, encY, size);
                     if (color) node.color = color;
-                    if (name) node.setName(name);
+                    if (name || pid) this.applyName(node, node.playerId || pid, name);
                 }
                 if (node && sticker != null) {
                     node.currentSticker = sticker || null;
@@ -2285,7 +2322,8 @@ setSpect() {
         node.setSize(size);
         node.updateTime = this.timestamp;
         node.flag = spiked;
-        if (name) node.setName(name);
+        if (playerId) node.playerId = playerId;
+        this.applyName(node, playerId || node.playerId, name);
         
         // Админ-панель (если нужно)
         if (name && playerId === this.ownerPlayerId) {
