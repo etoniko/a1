@@ -285,7 +285,7 @@ function initHelloDialogScale() {
 const SERVERS = {
     ffa: "ffa0.agar.su",
     ffa1: "ffa2.agar.su:6001",
-    ms: "ms.agar.su:6001",
+    ms: "ms2.agar.su",
     pvp1: "ms.agar.su:6004",
     tournament: "ms.agar.su:6002"
 };
