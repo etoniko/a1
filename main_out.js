@@ -98,11 +98,11 @@ function wrapChatMessageLines(message, prefixWidth, maxWidth, fontSize) {
 }
 
 function getGameServerApiBase(hostOrUrl) {
-    if (!hostOrUrl) return "https://ffa.agar.su";
+    if (!hostOrUrl) return "https://ffa2.agar.su";
     if (/^https?:\/\//i.test(hostOrUrl)) return String(hostOrUrl).replace(/\/$/, "");
     
-    // Дополнительная проверка для ffa.agar.su
-    if (hostOrUrl === "ffa.agar.su") return "https://ffa.agar.su";
+    // Дополнительная проверка для ffa2.agar.su
+    if (hostOrUrl === "ffa2.agar.su") return "https://ffa2.agar.su";
     
     const proto = location.protocol === "https:" ? "https://" : "http://";
     return proto + String(hostOrUrl).replace(/^wss?:\/\//i, "");
@@ -283,7 +283,7 @@ function initHelloDialogScale() {
 }
 
 const SERVERS = {
-    ffa: "ffa.agar.su",
+    ffa: "ffa2.agar.su",
     ffa1: "ffa2.agar.su:6001",
     ms: "ms.agar.su:6001",
     pvp1: "ms.agar.su:6004",
