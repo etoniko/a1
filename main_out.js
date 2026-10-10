@@ -283,7 +283,7 @@ function initHelloDialogScale() {
 }
 
 const SERVERS = {
-    ffa: "ffa0.agar.su",
+    ffa: "ffa.agar.su",
     ffa1: "ffa2.agar.su:6001",
     ms: "ms2.agar.su",
     pvp1: "ms.agar.su:6004",
@@ -2179,8 +2179,9 @@ setSpect() {
                     const x = this.leftPos + encX;
                     const y = this.topPos + encY;
                     node = new Cell(handle, x, y, size, color || "#00ff00", "");
-                    node.nx = x; node.ny = y; node.nSize = size;
+                    node.nx = x; node.ny = y;
                     node.encX = encX; node.encY = encY;
+                    node.setSize(size);
                     node.updateTime = this.timestamp;
                     node.isVirus = kind === 2;
                     node.isEjected = kind === 3;
@@ -2848,7 +2849,11 @@ class Cell {
             }
             if ((game.showMass || isPlayer) && !this.isVirus && !this.isEjected && !this.isAgitated && this.size > 100) {
                 const mass = ~~(this.size * this.size * 0.01);
+                if (!this.sizeCache) {
+                    this.sizeCache = new UText(this.getNameSize() * 0.5, "#FFFFFF", true, "#000000");
+                }
                 const cache = this.sizeCache;
+                cache.setSize(this.getNameSize() * 0.5);
                 cache.setValue(mass);
                 cache.setScale(scale);
                 const canvas = cache.render();
