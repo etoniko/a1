@@ -1273,17 +1273,36 @@ setSpect() {
                 const LBplayerNum = msg.getUint32(offset, true);
                 offset += 4;
                 this.leaderBoard = [];
+                if (!this.lbByPid) this.lbByPid = Object.create(null);
                 for (let i = 0; i < LBplayerNum; ++i) {
-                    const nodeId = msg.getUint32(offset, true);
+                    const pidWire = msg.getUint32(offset, true);
                     offset += 4;
-                    const playerName = getString();
-                    const playerXp = msg.getUint32(offset, true);
-                    offset += 4;
-                    const level = playerXp ? this.getLevel(playerXp) : -1;
+                    const hasInfo = (pidWire & 0x80000000) !== 0;
+                    const pid = pidWire & 0x7fffffff;
+                    let playerName = "";
+                    let playerXp = 0;
+                    if (hasInfo) {
+                        playerXp = msg.getUint32(offset, true);
+                        offset += 4;
+                        const nameBytes = [];
+                        while (offset < msg.byteLength) {
+                            const b = msg.getUint8(offset++);
+                            if (!b) break;
+                            nameBytes.push(b);
+                        }
+                        playerName = nameBytes.length ? new TextDecoder("utf-8").decode(new Uint8Array(nameBytes)) : "";
+                        this.lbByPid[pid] = { name: playerName, xp: playerXp };
+                    } else {
+                        const cached = this.lbByPid[pid];
+                        if (cached) {
+                            playerName = cached.name;
+                            playerXp = cached.xp;
+                        }
+                    }
                     this.leaderBoard.push({
-                        id: nodeId,
+                        id: pid,
                         name: playerName,
-                        level,
+                        level: playerXp ? this.getLevel(playerXp) : -1,
                         xp: playerXp
                     });
                 }
@@ -1298,9 +1317,11 @@ setSpect() {
                 offset += 8;
                 this.bottomPos = msg.getFloat64(offset, true);
                 offset += 8;
-                this.foodMinSize = (msg.getUint16(offset, true) * 100) ** .5;
+                this.foodMass = msg.getUint16(offset, true);
                 offset += 2;
-                this.foodMaxSize = (msg.getUint16(offset, true) * 100) ** .5;
+                this.foodMaxMass = msg.getUint16(offset, true);
+                this.foodMinSize = Math.ceil(Math.sqrt(100 * (this.foodMass || 1)));
+                this.foodMaxSize = Math.ceil(Math.sqrt(100 * (this.foodMaxMass || this.foodMass || 1)));
                 offset += 2;
                 this.ownerPlayerId = msg.getUint32(offset, true);
                 offset += 4;
@@ -1930,57 +1951,136 @@ setSpect() {
         }
     }
     
-    for (let nodeid; (nodeid = reader.uint32());) {
-        const type = reader.uint8();
-        let posX = 0, posY = 0, size = 0, playerId = 0;
-        
-        if (type === 1) {
-            posX = this.leftPos + (this.rightPos * 2) * this.normalizeFractlPart(nodeid);
-            posY = this.topPos + (this.bottomPos * 2) * this.normalizeFractlPart(nodeid * nodeid);
-        } else {
-            if (type === 0) playerId = reader.uint32();
-            posX = reader.int32();
-            posY = reader.int32();
-            size = reader.uint16();
-        }
-        
-        const r = reader.uint8();
-        const g = reader.uint8();
-        const b = reader.uint8();
-        let color = ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
-        color = `#${color}`;
-        
-        const spiked = reader.uint8();
-        const flagVirus = !!(spiked & 0x01);
-        const flagAgitated = !!(spiked & 0x10);
-        const flagEjected = !!(spiked & 0x20) || !!(spiked & 0x40);
-        
-        const name = reader.utf8();
-        
-        // ========== ЧТЕНИЕ СТИКЕРА (ДОБАВИТЬ ЭТОТ БЛОК) ==========
-        let stickerData = null;
-        if (reader.canRead) {
-            const marker = reader.uint8();
-            if (marker === 0xFF) {
-                stickerData = reader.uint8();
-            }
-        }
-        // ========================================================
-        
+    const norm = (n) => (n % (Math.PI * 2)) / (Math.PI * 2);
+    const foodPos = (id) => {
+        const w = (this.rightPos - this.leftPos) || 1;
+        const h = (this.bottomPos - this.topPos) || 1;
+        return { x: this.leftPos + w * norm(id), y: this.topPos + h * norm(id * id) };
+    };
+    const foodSize = (id) => {
+        let minMass = this.foodMass | 0;
+        let maxMass = this.foodMaxMass | 0;
+        if (!(minMass > 0)) minMass = 1;
+        if (!(maxMass >= minMass)) maxMass = minMass;
+        return Math.ceil(Math.sqrt(100 * (minMass + (id >>> 0) % (maxMass - minMass + 1))));
+    };
+    const FOOD_HEX = ("003366 336699 3366CC 003399 000099 0000CC 000066 006666 006699 0099CC 0066CC 0033CC 0000FF 3333FF 333399 " +
+        "669999 009999 33CCCC 00CCFF 0099FF 0066FF 3366FF 3333CC 666699 339966 00CC99 00FFCC 00FFFF 33CCFF 3399FF 6699FF 6666FF 6600FF 6600CC " +
+        "339933 00CC66 00FF99 66FFCC 66FFFF 66CCFF 99CCFF 9999FF 9966FF 9933FF 9900FF 006600 00CC00 00FF00 66FF99 99FFCC CCFFFF CCCCFF CC99FF CC66FF CC33FF CC00FF 9900CC " +
+        "003300 009933 33CC33 66FF66 99FF99 CCFFCC FFCCFF FF99FF FF66FF FF00FF CC00CC 660066 336600 009900 66FF33 99FF66 CCFF99 FFFFCC FFCCCC FF99CC FF66CC FF33CC CC0099 993399 " +
+        "333300 669900 99FF33 CCFF66 FFFF99 FFCC99 FF9999 FF6699 FF3399 CC3399 990099 666633 99CC00 CCFF33 FFFF66 FFCC66 FF9966 FF6666 FF0066 CC6699 993366 " +
+        "999966 CCCC00 FFFF00 FFCC00 FF9933 FF6600 FF5050 CC0066 660033 996633 CC9900 FF9900 CC6600 FF3300 FF0000 CC0000 990033 663300 996600 CC3300 993300 990000 800000 993333").split(" ");
+    const foodColor = (id) => "#" + FOOD_HEX[(id >>> 0) % FOOD_HEX.length];
+    const virusColor = (size) => {
+        const steps = [100, 105, 111, 116, 121, 126, 131];
+        const hex = ["00ff00", "80ff00", "fbff00", "ffc800", "ff9600", "ff6400", "ff3200"];
+        let h = hex[0];
+        for (let i = 0; i < steps.length; i++) if (size >= steps[i]) h = hex[i];
+        return "#" + h;
+    };
+    const place = (node, x, y, size, color) => {
+        node.updatePos();
+        node.ox = node.x;
+        node.oy = node.y;
+        node.oSize = node.size;
+        if (color) node.color = color;
+        node.nx = x;
+        node.ny = y;
+        node.setSize(size);
+        node.updateTime = this.timestamp;
+    };
+    const spawn = (id, x, y, size, color, name) => {
+        const node = new Cell(id, x, y, size, color, name || "");
+        this.nodes[id] = node;
+        this.nodelist.push(node);
+        node.ka = x;
+        node.la = y;
+        node.nx = x;
+        node.ny = y;
+        node.updateTime = this.timestamp;
+        return node;
+    };
+
+    for (let foodId; (foodId = reader.uint16());) {
+        const pos = foodPos(foodId);
+        const size = foodSize(foodId);
+        const color = foodColor(foodId);
+        let node = this.nodes[foodId];
+        if (node) place(node, pos.x, pos.y, size, color);
+        else node = spawn(foodId, pos.x, pos.y, size, color, "");
+        node.isVirus = false;
+        node.isEjected = false;
+        node.isAgitated = false;
+        node.isFood = true;
+        node.flag = 0;
+    }
+    for (let raw; (raw = reader.uint16());) {
+        const withXY = (raw & 0x8000) !== 0;
+        const nodeid = 65536 + (raw & 0x7fff);
+        let x = 0, y = 0;
+        if (withXY) { x = reader.int16(); y = reader.int16(); }
+        const r = reader.uint8(), g = reader.uint8(), b = reader.uint8();
+        const color = "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
         let node = this.nodes[nodeid];
-        if (node) {
-            node.updatePos();
-            node.ox = node.x;
-            node.oy = node.y;
-            node.oSize = node.size;
-            node.color = color;
+        if (!withXY && !node) continue;
+        if (node) place(node, x, y, 35, color);
+        else node = spawn(nodeid, x, y, 35, color, "");
+        node.isVirus = false;
+        node.isEjected = true;
+        node.isAgitated = false;
+        node.flag = 0;
+    }
+    for (let raw; (raw = reader.uint16());) {
+        const withXY = (raw & 0x8000) !== 0;
+        const nodeid = 131072 + (raw & 0x7fff);
+        let x = 0, y = 0;
+        if (withXY) { x = reader.int16(); y = reader.int16(); }
+        const size = reader.uint16();
+        const color = virusColor(size);
+        let node = this.nodes[nodeid];
+        if (!withXY && !node) continue;
+        if (node) place(node, x, y, size, color);
+        else node = spawn(nodeid, x, y, size, color, "");
+        node.isVirus = true;
+        node.isEjected = false;
+        node.isAgitated = false;
+        node.flag = 1;
+    }
+    if (!this.playerNicks) this.playerNicks = Object.create(null);
+    for (let idWire; (idWire = reader.uint32());) {
+        const full = (idWire & 0x80000000) !== 0;
+        const nodeid = idWire & 0x7fffffff;
+        let x = 0, y = 0, size = 0, playerId = 0, name = "", color = "";
+        if (full) {
+            const pidWire = reader.uint32();
+            const hasName = (pidWire & 0x80000000) !== 0;
+            playerId = pidWire & 0x7fffffff;
+            x = reader.int16();
+            y = reader.int16();
+            size = reader.uint16();
+            if (hasName) {
+                const r = reader.uint8(), g = reader.uint8(), b = reader.uint8();
+                color = "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+                name = reader.utf8();
+                if (playerId) this.playerNicks[playerId] = name;
+            }
         } else {
-            node = new Cell(nodeid, posX, posY, size, color, name);
-            this.nodes[nodeid] = node;
-            this.nodelist.push(node);
-            node.ka = posX;
-            node.la = posY;
-            if (playerId === this.ownerPlayerId) {
+            x = reader.int16();
+            y = reader.int16();
+            size = reader.uint16();
+            const known = this.nodes[nodeid];
+            if (!known) continue;
+            playerId = known.playerId || 0;
+            name = known.name || "";
+            color = known.color || "";
+        }
+        if (!name && playerId && this.playerNicks[playerId]) name = this.playerNicks[playerId];
+        if (!color) color = "#808080";
+        let node = this.nodes[nodeid];
+        if (node) place(node, x, y, size, color);
+        else {
+            node = spawn(nodeid, x, y, size, color, name);
+            if (playerId && playerId === this.ownerPlayerId) {
                 this.hideOverlays();
                 this.playerCells.push(node);
                 if (this.playerCells.length === 1) {
@@ -1992,48 +2092,32 @@ setSpect() {
                 }
             }
         }
-        
-        // ========== УСТАНОВКА СТИКЕРА ==========
-        if (stickerData !== null) {
-            node.currentSticker = stickerData;
-            node.stickerActive = true;
-        } else if (node) {
-            node.stickerActive = false;
-            node.currentSticker = null;
-        }
-        // =======================================
-        
-        node.isVirus = flagVirus;
-        node.isEjected = flagEjected;
-        node.isAgitated = flagAgitated;
-        node.nx = posX;
-        node.ny = posY;
-        node.setSize(size);
-        node.updateTime = this.timestamp;
-        node.flag = spiked;
+        if (playerId) node.playerId = playerId;
+        node.isVirus = false;
+        node.isEjected = false;
+        node.isAgitated = false;
+        node.flag = 0;
         if (name) node.setName(name);
-        
-        // Админ-панель (если нужно)
         if (name && playerId === this.ownerPlayerId) {
             const lowerName = name.toLowerCase().trim();
             const isAdmin = this.admins?.some(admin => lowerName.includes(admin.toLowerCase()));
             const isModer = this.moders?.some(moder => lowerName.includes(moder.toLowerCase()));
-            const panel = document.querySelector('.adminpanel');
+            const panel = document.querySelector(".adminpanel");
             if (panel) {
-                panel.style.display = 'none';
+                panel.style.display = "none";
                 if (isAdmin) {
-                    panel.style.display = 'flex';
-                    panel.style.background = 'rgb(146, 15, 15)';
-                    panel.textContent = 'ADMINKA';
+                    panel.style.display = "flex";
+                    panel.style.background = "rgb(146, 15, 15)";
+                    panel.textContent = "ADMINKA";
                 } else if (isModer) {
-                    panel.style.display = 'flex';
-                    panel.style.background = 'rgb(2, 89, 255)';
-                    panel.textContent = 'MODERKA';
+                    panel.style.display = "flex";
+                    panel.style.background = "rgb(2, 89, 255)";
+                    panel.textContent = "MODERKA";
                 }
             }
         }
     }
-    
+
     while (reader.canRead) {
         const node = this.nodes[reader.uint32()];
         if (node) node.destroy();
