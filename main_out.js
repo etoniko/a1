@@ -2081,10 +2081,12 @@ setSpect() {
         node.flag = 1;
     }
     if (!this.playerNicks) this.playerNicks = Object.create(null);
+    if (!this.playerColors) this.playerColors = Object.create(null);
     for (let idWire; (idWire = reader.uint32());) {
         const full = (idWire & 0x80000000) !== 0;
         const nodeid = idWire & 0x7fffffff;
         let x = 0, y = 0, size = 0, playerId = 0, name = "", color = "";
+        let colorProvided = false;
         if (full) {
             const pidWire = reader.uint32();
             const hasName = (pidWire & 0x80000000) !== 0;
@@ -2095,8 +2097,12 @@ setSpect() {
             if (hasName) {
                 const r = reader.uint8(), g = reader.uint8(), b = reader.uint8();
                 color = "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+                colorProvided = true;
                 name = reader.utf8();
-                if (playerId) this.playerNicks[playerId] = name;
+                if (playerId) {
+                    this.playerNicks[playerId] = name;
+                    this.playerColors[playerId] = color;
+                }
             }
         } else {
             x = reader.int16();
@@ -2109,8 +2115,11 @@ setSpect() {
             color = known.color || "";
         }
         if (!name && playerId && this.playerNicks[playerId]) name = this.playerNicks[playerId];
+        if (!colorProvided && playerId && this.playerColors[playerId]) color = this.playerColors[playerId];
+        const existing = this.nodes[nodeid];
+        if (!color && existing) color = existing.color || "";
         if (!color) color = "#808080";
-        let node = this.nodes[nodeid];
+        let node = existing;
         if (node) place(node, x, y, size, color);
         else {
             node = spawn(nodeid, x, y, size, color, name);
@@ -2127,6 +2136,12 @@ setSpect() {
             }
         }
         if (playerId) node.playerId = playerId;
+        if (colorProvided && playerId) {
+            for (let i = 0; i < this.nodelist.length; i++) {
+                const other = this.nodelist[i];
+                if (other && other.playerId === playerId && !other.isVirus && !other.isEjected && !other.isFood) other.color = color;
+            }
+        }
         node.isVirus = false;
         node.isEjected = false;
         node.isAgitated = false;
