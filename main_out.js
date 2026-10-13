@@ -2051,24 +2051,17 @@ setSpect() {
     for (let raw; (raw = reader.uint16());) {
         const withXY = (raw & 0x8000) !== 0;
         const nodeid = 65536 + (raw & 0x7fff);
-        let x = 0, y = 0;
-        if (withXY) { x = reader.int16(); y = reader.int16(); }
+        let node = this.nodes[nodeid];
+        if (!withXY) {
+            if (node) node.updateTime = this.timestamp;
+            continue;
+        }
+        const x = reader.int16();
+        const y = reader.int16();
         const r = reader.uint8(), g = reader.uint8(), b = reader.uint8();
         const color = "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
-        let node = this.nodes[nodeid];
-        if (!withXY && !node) continue;
-        if (node) {
-            if (withXY) place(node, x, y, 35, color);
-            else {
-                node.updatePos();
-                node.ox = node.x;
-                node.oy = node.y;
-                node.oSize = node.size;
-                if (!node.color) node.color = color;
-                node.setSize(35);
-                node.updateTime = this.timestamp;
-            }
-        } else node = spawn(nodeid, x, y, 35, color, "");
+        if (node) place(node, x, y, 35, color);
+        else node = spawn(nodeid, x, y, 35, color, "");
         node.isVirus = false;
         node.isEjected = true;
         node.isAgitated = false;
