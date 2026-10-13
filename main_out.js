@@ -2064,7 +2064,7 @@ setSpect() {
                 node.ox = node.x;
                 node.oy = node.y;
                 node.oSize = node.size;
-                node.color = color;
+                if (!node.color) node.color = color;
                 node.setSize(35);
                 node.updateTime = this.timestamp;
             }
@@ -2349,6 +2349,22 @@ class UText {
 
 const smoothRender = 0.4;
 const closebord = false;
+
+function vividColor(hex) {
+    if (!hex || hex.length < 7 || hex.charAt(0) !== "#") return hex || "#FFFFFF";
+    const r0 = parseInt(hex.substr(1, 2), 16);
+    const g0 = parseInt(hex.substr(3, 2), 16);
+    const b0 = parseInt(hex.substr(5, 2), 16);
+    if (isNaN(r0) || isNaN(g0) || isNaN(b0)) return hex;
+    const max = Math.max(r0, g0, b0);
+    if (max === 0) return "#E8E8E8";
+    if (max >= 230) return hex;
+    const scale = 245 / max;
+    const r = Math.min(255, (r0 * scale + 0.5) | 0);
+    const g = Math.min(255, (g0 * scale + 0.5) | 0);
+    const b = Math.min(255, (b0 * scale + 0.5) | 0);
+    return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+}
 
 const Quad = {
     init: function (args) {
@@ -2637,8 +2653,9 @@ class Cell {
         ctx.lineWidth = closebord ? 0 : 10;
         ctx.lineCap = "round";
         ctx.lineJoin = this.isVirus ? "miter" : "round";
-        ctx.fillStyle = this.color;
-        ctx.strokeStyle = simpleRender ? this.color : this.getStrokeColor();
+        const paint = vividColor(this.color);
+        ctx.fillStyle = paint;
+        ctx.strokeStyle = paint;
 
         ctx.beginPath();
         if (simpleRender) {
