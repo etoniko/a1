@@ -1991,6 +1991,7 @@ setSpect() {
     };
     const spawn = (id, x, y, size, color, name) => {
         const node = new Cell(id, x, y, size, color, name || "");
+        node.setSize(size);
         this.nodes[id] = node;
         this.nodelist.push(node);
         node.ka = x;
@@ -2398,9 +2399,9 @@ class Cell {
         this.x = this.ox = ux;
         this.y = this.oy = uy;
         this.size = this.oSize = usize;
-        this.nx = 0;
-        this.ny = 0;
-        this.nSize = 0;
+        this.nx = ux;
+        this.ny = uy;
+        this.nSize = usize;
         this.color = ucolor;
         this.name = null;
         this.nameCache = null;
@@ -2576,8 +2577,16 @@ class Cell {
             ctx.arc(this.x, this.y, renderSize, 0, 2 * Math.PI);
         } else {
             this.movePoints();
-            ctx.moveTo(this.points[0].x, this.points[0].y);
-            this.points.forEach(p => ctx.lineTo(p.x, p.y));
+            const first = this.points[0];
+            if (!first) {
+                ctx.arc(this.x, this.y, renderSize, 0, 2 * Math.PI);
+            } else {
+                ctx.moveTo(first.x, first.y);
+                for (let i = 0; i < this.points.length; i++) {
+                    const p = this.points[i];
+                    if (p) ctx.lineTo(p.x, p.y);
+                }
+            }
         }
         ctx.closePath();
         if (!closebord) ctx.stroke();
