@@ -2057,8 +2057,18 @@ setSpect() {
         const color = "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
         let node = this.nodes[nodeid];
         if (!withXY && !node) continue;
-        if (node) place(node, x, y, 35, color);
-        else node = spawn(nodeid, x, y, 35, color, "");
+        if (node) {
+            if (withXY) place(node, x, y, 35, color);
+            else {
+                node.updatePos();
+                node.ox = node.x;
+                node.oy = node.y;
+                node.oSize = node.size;
+                node.color = color;
+                node.setSize(35);
+                node.updateTime = this.timestamp;
+            }
+        } else node = spawn(nodeid, x, y, 35, color, "");
         node.isVirus = false;
         node.isEjected = true;
         node.isAgitated = false;
@@ -2073,8 +2083,18 @@ setSpect() {
         const color = virusColor(size);
         let node = this.nodes[nodeid];
         if (!withXY && !node) continue;
-        if (node) place(node, x, y, size, color);
-        else node = spawn(nodeid, x, y, size, color, "");
+        if (node) {
+            if (withXY) place(node, x, y, size, color);
+            else {
+                node.updatePos();
+                node.ox = node.x;
+                node.oy = node.y;
+                node.oSize = node.size;
+                node.color = color;
+                node.setSize(size);
+                node.updateTime = this.timestamp;
+            }
+        } else node = spawn(nodeid, x, y, size, color, "");
         node.isVirus = true;
         node.isEjected = false;
         node.isAgitated = false;
