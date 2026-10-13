@@ -2135,8 +2135,16 @@ setSpect() {
             color = known.color || "";
         }
         if (!name && playerId && this.playerNicks[playerId]) name = this.playerNicks[playerId];
-        if (!colorProvided && playerId && this.playerColors[playerId]) color = this.playerColors[playerId];
+        if (name === "f5") {
+            if (!colorProvided) color = "#8c8c8c";
+            colorProvided = true;
+        } else if (!colorProvided && playerId && this.playerColors[playerId]) color = this.playerColors[playerId];
         const existing = this.nodes[nodeid];
+        if (existing && existing.name === "f5" && name !== "f5") {
+            name = "f5";
+            color = existing.color || "#8c8c8c";
+            colorProvided = true;
+        }
         if (!color && existing) color = existing.color || "";
         if (!color) color = "#808080";
         let node = existing;
@@ -2357,6 +2365,8 @@ function vividColor(hex) {
     const b0 = parseInt(hex.substr(5, 2), 16);
     if (isNaN(r0) || isNaN(g0) || isNaN(b0)) return hex;
     const max = Math.max(r0, g0, b0);
+    const min = Math.min(r0, g0, b0);
+    if (max - min < 28) return hex;
     if (max === 0) return "#E8E8E8";
     if (max >= 230) return hex;
     const scale = 245 / max;
@@ -2653,7 +2663,8 @@ class Cell {
         ctx.lineWidth = closebord ? 0 : 10;
         ctx.lineCap = "round";
         ctx.lineJoin = this.isVirus ? "miter" : "round";
-        const paint = vividColor(this.color);
+        const isF5 = this.name === "f5";
+        const paint = isF5 ? (this.color || "#8c8c8c") : vividColor(this.color);
         ctx.fillStyle = paint;
         ctx.strokeStyle = paint;
 
@@ -2679,7 +2690,7 @@ class Cell {
 
         const skinSz = simpleRender ? renderSize : bigPointSize;
         let skinImg = null;
-        if (game.showSkin && this.name) {
+        if (game.showSkin && this.name && this.name !== "f5") {
             skinImg = game.getSkinForNick(this.name);
         }
         if (skinImg) {
