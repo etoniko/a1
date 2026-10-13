@@ -1327,6 +1327,7 @@ setSpect() {
                 offset += 4;
                 this.mapWidth = (this.rightPos + this.leftPos) / 2;
                 this.mapHeight = (this.bottomPos + this.topPos) / 2;
+                this.repositionFood();
                 this.posX = (this.rightPos + this.leftPos) / 2;
                 this.posY = (this.bottomPos + this.topPos) / 2;
                 this.posSize = 1;
@@ -1540,7 +1541,11 @@ setSpect() {
         this.ctx.scale(this.viewZoom, this.viewZoom);
         this.ctx.translate(-this.nodeX, -this.nodeY);
         for (let d = 0; d < this.Cells.length; d++) this.Cells[d].drawOneCell(this.ctx);
-        for (let d = 0; d < this.nodelist.length; d++) this.nodelist[d].drawOneCell(this.ctx);
+        for (let d = 0; d < this.nodelist.length; d++) {
+            const node = this.nodelist[d];
+            if (node && node._foodPending) continue;
+            node.drawOneCell(this.ctx);
+        }
         this.ctx.restore();
         this.drawSplitIcon(this.ctx);
         this.drawTouch(this.ctx);
@@ -1930,7 +1935,25 @@ setSpect() {
         }
     }
     normalizeFractlPart(n) {
-        return (n % (Math.PI * 2)) / (Math.PI * 2);
+        let r = n % (Math.PI * 2);
+        if (r < 0) r += Math.PI * 2;
+        return r / (Math.PI * 2);
+    }
+    repositionFood() {
+        const w = this.rightPos - this.leftPos;
+        const h = this.bottomPos - this.topPos;
+        if (!(w > 1) || !(h > 1)) return;
+        const now = Date.now();
+        for (let i = 0; i < this.nodelist.length; i++) {
+            const node = this.nodelist[i];
+            if (!node || !node.isFood) continue;
+            const x = this.leftPos + w * this.normalizeFractlPart(node.id);
+            const y = this.topPos + h * this.normalizeFractlPart(node.id * node.id);
+            node._foodPending = false;
+            node.x = node.ox = node.nx = node.ka = x;
+            node.y = node.oy = node.ny = node.la = y;
+            node.updateTime = now;
+        }
     }
    updateNodes(reader) {
     this.timestamp = Date.now();
@@ -1953,8 +1976,9 @@ setSpect() {
     
     const norm = (n) => (n % (Math.PI * 2)) / (Math.PI * 2);
     const foodPos = (id) => {
-        const w = (this.rightPos - this.leftPos) || 1;
-        const h = (this.bottomPos - this.topPos) || 1;
+        const w = this.rightPos - this.leftPos;
+        const h = this.bottomPos - this.topPos;
+        if (!(w > 1) || !(h > 1)) return null;
         return { x: this.leftPos + w * norm(id), y: this.topPos + h * norm(id * id) };
     };
     const foodSize = (id) => {
@@ -2007,8 +2031,17 @@ setSpect() {
         const size = foodSize(foodId);
         const color = foodColor(foodId);
         let node = this.nodes[foodId];
+        if (!pos) {
+            if (!node) {
+                node = spawn(foodId, 0, 0, size, color, "");
+                node.isFood = true;
+                node._foodPending = true;
+            }
+            continue;
+        }
         if (node) place(node, pos.x, pos.y, size, color);
         else node = spawn(foodId, pos.x, pos.y, size, color, "");
+        node._foodPending = false;
         node.isVirus = false;
         node.isEjected = false;
         node.isAgitated = false;
