@@ -1474,6 +1474,7 @@ setSpect() {
                 e = 0;
             for (var i = 0; i < this.nodelist.length; i++) {
                 var node = this.nodelist[i];
+                if (node.isFood || node.isEjected) continue;
                 if (node.shouldRender() && !node.prepareData && 20 < node.size * this.viewZoom) {
                     e = Math.max(node.size, e);
                     a = Math.min(node.x, a);
@@ -1492,6 +1493,7 @@ setSpect() {
             });
             for (i = 0; i < this.nodelist.length; i++) {
                 node = this.nodelist[i];
+                if (node.isFood || node.isEjected) continue;
                 if (node.shouldRender() && !(20 >= node.size * this.viewZoom)) {
                     for (a = 0; a < node.points.length; ++a) {
                         b = node.points[a].x;
@@ -1501,6 +1503,39 @@ setSpect() {
                 }
             }
         }
+    }
+    drawBatchedFood(ctx) {
+        const list = this.nodelist;
+        if (!list || !list.length) return;
+        const byColor = new Map();
+        for (let i = 0; i < list.length; i++) {
+            const node = list[i];
+            if (!node || !node.isFood || node.destroyed) continue;
+            node.updatePos();
+            if (!node.shouldRender()) continue;
+            node.drawTime = this.timestamp;
+            let r = node.size;
+            if (!(r > 0) || r > 4000) continue;
+            const color = node.color || "#AAAAAA";
+            let bucket = byColor.get(color);
+            if (!bucket) {
+                bucket = [];
+                byColor.set(color, bucket);
+            }
+            bucket.push(node.x, node.y, r);
+        }
+        byColor.forEach(function (coords, color) {
+            ctx.beginPath();
+            for (let i = 0; i < coords.length; i += 3) {
+                const x = coords[i];
+                const y = coords[i + 1];
+                const radius = coords[i + 2];
+                ctx.moveTo(x + radius, y);
+                ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            }
+            ctx.fillStyle = color;
+            ctx.fill();
+        });
     }
     drawGameScene() {
         if (this.shouldHideGameCanvas()) {
@@ -1536,7 +1571,12 @@ setSpect() {
         this.ctx.scale(this.viewZoom, this.viewZoom);
         this.ctx.translate(-this.nodeX, -this.nodeY);
         for (let d = 0; d < this.Cells.length; d++) this.Cells[d].drawOneCell(this.ctx);
-        for (let d = 0; d < this.nodelist.length; d++) this.nodelist[d].drawOneCell(this.ctx);
+        this.drawBatchedFood(this.ctx);
+        for (let d = 0; d < this.nodelist.length; d++) {
+            const node = this.nodelist[d];
+            if (node && node.isFood) continue;
+            node.drawOneCell(this.ctx);
+        }
         this.ctx.restore();
         this.drawSplitIcon(this.ctx);
         this.drawTouch(this.ctx);
@@ -1937,7 +1977,7 @@ setSpect() {
     }
     foodRgb(id) {
         let n = (Math.imul(id, 747796405) + 2891336453) >>> 0;
-        const third = n & 255;
+        const third = n & 0xE0;
         n = (Math.imul(n, 1664525) + 1013904223) >>> 0;
         const slots = [255, 7, third];
         const order = [
@@ -2908,6 +2948,7 @@ class Cell {
         return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
     }
     drawOneCell(ctx) {
+        if (this.isFood) return;
         if (!this.shouldRender()) return;
 
         const simpleRender = this.id !== 0 && !this.isAgitated && smoothRender > game.viewZoom || this.getNumPoints() < 10;
