@@ -2394,13 +2394,16 @@ setSpect() {
     if (reader.offset + 2 <= reader.byteLength) {
         const foodCount = reader.uint16();
         for (let f = 0; f < foodCount; f++) {
-            if (reader.offset + 8 > reader.byteLength) break;
+            if (reader.offset + 11 > reader.byteLength) break;
             const foodId = reader.uint32();
             const foodX = reader.int16();
             const foodY = reader.int16();
+            const foodR = reader.uint8();
+            const foodG = reader.uint8();
+            const foodB = reader.uint8();
             addedFood.add(foodId);
             const foodSize = this.computeFoodSize();
-            const foodColor = this.foodColorHex(foodId);
+            const foodColor = "#" + (foodR << 16 | foodG << 8 | foodB).toString(16).padStart(6, "0");
             let food = this.nodes[foodId];
             if (food) {
                 food.updatePos();
