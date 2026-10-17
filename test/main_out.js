@@ -2146,7 +2146,7 @@ setSpect() {
         const now = Date.now();
         for (let i = 0; i < this.nodelist.length; i++) {
             const node = this.nodelist[i];
-            if (!node || !node.isFood || node.foodPlaced) continue;
+            if (!node || !node.isFood) continue;
             const pos = this.computeFoodPosition(node.id);
             const sz = this.computeFoodSize();
             node.color = this.foodColorHex(node.id);
@@ -2181,6 +2181,7 @@ setSpect() {
         }
     }
    updateNodes(reader) {
+    const VIRUS_NODE_BASE = 2147483648;
     const EJECT_SIZE = 35;
     this.timestamp = Date.now();
     this.ua = false;
@@ -2394,16 +2395,12 @@ setSpect() {
     if (reader.offset + 2 <= reader.byteLength) {
         const foodCount = reader.uint16();
         for (let f = 0; f < foodCount; f++) {
-            if (reader.offset + 11 > reader.byteLength) break;
-            const foodId = reader.uint32();
-            const foodX = reader.int16();
-            const foodY = reader.int16();
-            const foodR = reader.uint8();
-            const foodG = reader.uint8();
-            const foodB = reader.uint8();
+            if (reader.offset + 2 > reader.byteLength) break;
+            const foodId = reader.uint16();
             addedFood.add(foodId);
+            const foodPos = this.computeFoodPosition(foodId);
             const foodSize = this.computeFoodSize();
-            const foodColor = "#" + (foodR << 16 | foodG << 8 | foodB).toString(16).padStart(6, "0");
+            const foodColor = this.foodColorHex(foodId);
             let food = this.nodes[foodId];
             if (food) {
                 food.updatePos();
@@ -2411,20 +2408,19 @@ setSpect() {
                 food.oy = food.y;
                 food.oSize = food.size;
             } else {
-                if (this.nodelist.length >= 12000) return;
-                food = new Cell(foodId, foodX, foodY, foodSize, foodColor, "");
+                if (this.nodelist.length >= 5000) return;
+                food = new Cell(foodId, foodPos.x, foodPos.y, foodSize, foodColor, "");
                 this.nodelist.push(food);
                 this.nodes[foodId] = food;
-                food.ka = foodX;
-                food.la = foodY;
+                food.ka = foodPos.x;
+                food.la = foodPos.y;
             }
             food.color = foodColor;
             food.isFood = true;
-            food.foodPlaced = true;
             food.isVirus = false;
             food.isEjected = false;
-            food.nx = foodX;
-            food.ny = foodY;
+            food.nx = foodPos.x;
+            food.ny = foodPos.y;
             food.setSize(foodSize);
             food.updateTime = this.timestamp;
             food.flag = 0;
@@ -2479,7 +2475,7 @@ setSpect() {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 8 > reader.byteLength) break;
-            const virusId = reader.uint16();
+            const virusId = VIRUS_NODE_BASE + reader.uint16();
             const posX = reader.int16();
             const posY = reader.int16();
             const size = reader.uint16();
@@ -2491,7 +2487,7 @@ setSpect() {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 4 > reader.byteLength) break;
-            const virusId = reader.uint16();
+            const virusId = VIRUS_NODE_BASE + reader.uint16();
             const virus = this.nodes[virusId];
             const dx = reader.int8();
             const dy = reader.int8();
@@ -2503,7 +2499,7 @@ setSpect() {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 6 > reader.byteLength) break;
-            const virusId = reader.uint16();
+            const virusId = VIRUS_NODE_BASE + reader.uint16();
             const virus = this.nodes[virusId];
             const dx = reader.int8();
             const dy = reader.int8();
@@ -2516,7 +2512,7 @@ setSpect() {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 6 > reader.byteLength) break;
-            const virusId = reader.uint16();
+            const virusId = VIRUS_NODE_BASE + reader.uint16();
             const posX = reader.int16();
             const posY = reader.int16();
             moveVirus(virusId, posX, posY, null);
@@ -2526,7 +2522,7 @@ setSpect() {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 8 > reader.byteLength) break;
-            const virusId = reader.uint16();
+            const virusId = VIRUS_NODE_BASE + reader.uint16();
             const posX = reader.int16();
             const posY = reader.int16();
             const size = reader.uint16();
@@ -2617,8 +2613,8 @@ setSpect() {
     if (reader.offset + 2 <= reader.byteLength) {
         const foodGone = reader.uint16();
         for (let i = 0; i < foodGone; i++) {
-            if (reader.offset + 4 > reader.byteLength) break;
-            const foodId = reader.uint32();
+            if (reader.offset + 2 > reader.byteLength) break;
+            const foodId = reader.uint16();
             if (addedFood.has(foodId)) continue;
             const food = this.nodes[foodId];
             if (food) food.destroy();
@@ -2628,7 +2624,7 @@ setSpect() {
         const virusGone = reader.uint16();
         for (let i = 0; i < virusGone; i++) {
             if (reader.offset + 2 > reader.byteLength) break;
-            const virusId = reader.uint16();
+            const virusId = VIRUS_NODE_BASE + reader.uint16();
             if (addedFood.has(virusId)) continue;
             const virus = this.nodes[virusId];
             if (virus) virus.destroy();
