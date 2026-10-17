@@ -2064,6 +2064,7 @@ setSpect() {
                 node.oSize = node.size;
                 node.color = color;
             } else {
+                if (this.nodelist.length >= 5000) return;
                 node = new Cell(nodeid, posX, posY, size, color, packetName);
                 this.nodes[nodeid] = node;
                 this.nodelist.push(node);
@@ -2183,6 +2184,7 @@ setSpect() {
             node.oSize = node.size;
             node.color = color;
         } else {
+            if (this.nodelist.length >= 5000) return;
             node = new Cell(nodeid, posX, posY, size, color, packetName);
             this.nodes[nodeid] = node;
             this.nodelist.push(node);
@@ -2238,6 +2240,7 @@ setSpect() {
                 food.oy = food.y;
                 food.oSize = food.size;
             } else {
+                if (this.nodelist.length >= 5000) return;
                 food = new Cell(foodId, foodPos.x, foodPos.y, foodSize, foodColor, "");
                 this.nodelist.push(food);
                 this.nodes[foodId] = food;
@@ -2265,6 +2268,7 @@ setSpect() {
             virus.oy = virus.y;
             virus.oSize = virus.size;
         } else if (isNew) {
+            if (this.nodelist.length >= 5000) return;
             virus = new Cell(virusId, posX, posY, size, virusColor, "");
             this.nodelist.push(virus);
             this.nodes[virusId] = virus;
@@ -2366,6 +2370,7 @@ setSpect() {
             eject.oy = eject.y;
             eject.oSize = eject.size;
         } else if (isNew) {
+            if (this.nodelist.length >= 5000) return;
             eject = new Cell(ejectId, posX, posY, EJECT_SIZE, ejectColor, "");
             this.nodelist.push(eject);
             this.nodes[ejectId] = eject;
@@ -2491,21 +2496,27 @@ class BinaryReader {
         return this.offset < this.byteLength;
     }
     uint8() {
+        if (this.offset >= this.byteLength) return 0;
         return this.view.getUint8(this.offset++);
     }
     int8() {
+        if (this.offset >= this.byteLength) return 0;
         return this.view.getInt8(this.offset++);
     }
     uint16() {
+        if (this.offset + 2 > this.byteLength) return 0;
         return this.view.getUint16((this.offset += 2) - 2, true);
     }
     int16() {
+        if (this.offset + 2 > this.byteLength) return 0;
         return this.view.getInt16((this.offset += 2) - 2, true);
     }
     uint32() {
+        if (this.offset + 4 > this.byteLength) return 0;
         return this.view.getUint32((this.offset += 4) - 4, true);
     }
     int32() {
+        if (this.offset + 4 > this.byteLength) return 0;
         return this.view.getInt32((this.offset += 4) - 4, true);
     }
     utf16() {
@@ -2736,6 +2747,9 @@ class Cell {
         this.id = uid;
         this.x = this.ox = ux;
         this.y = this.oy = uy;
+        usize = usize | 0;
+        if (usize < 0) usize = 0;
+        if (usize > 4000) usize = 4000;
         this.size = this.oSize = usize;
         this.nx = 0;
         this.ny = 0;
@@ -2786,6 +2800,9 @@ class Cell {
         this.nameCache.setValue(this.name);
     }
     setSize(size) {
+        size = size | 0;
+        if (size < 0) size = 0;
+        if (size > 4000) size = 4000;
         this.nSize = size;
         if (!this.sizeCache) {
             this.sizeCache = new UText(this.getNameSize() * 0.5, "#FFFFFF", true, "#000000");
@@ -2794,19 +2811,20 @@ class Cell {
     }
     getNumPoints() {
         if (this.id === 0) return 16;
-        let minPoints = this.size < 20 ? 0 : 10;
-        if (this.isVirus) minPoints = 30;
-        let b = this.isVirus ? this.size : this.size * game.viewZoom;
-        b *= game.z;
-        if (this.flag & 32) b *= 0.25;
-        return ~~Math.max(b, minPoints);
+        if (this.isFood || this.isEjected) return 0;
+        if (!(this.size > 0) || this.size > 4000) return 0;
+        let count = this.isVirus ? 24 : this.size * game.viewZoom * (game.z || 1);
+        if (this.flag & 32) count *= 0.25;
+        count = count | 0;
+        if (count < 10) return 0;
+        if (count > 32) return 32;
+        return count;
     }
     createPoints() {
         const numPoints = this.getNumPoints();
-        while (this.points.length > numPoints) {
-            const idx = ~~(Math.random() * this.points.length);
-            this.points.splice(idx, 1);
-            this.pointsAcc.splice(idx, 1);
+        if (this.points.length > numPoints) {
+            this.points.length = numPoints;
+            this.pointsAcc.length = numPoints;
         }
         if (!this.points.length && numPoints > 0) {
             this.points.push({ ref: this, size: this.size, x: this.x, y: this.y });
@@ -2870,6 +2888,7 @@ class Cell {
     }
     shouldRender() {
         if (this.id === 0) return true;
+        if (!(this.size > 0) || this.size > 4000) return false;
         const margin = this.size + 40;
         const left = game.nodeX - game.canvasWidth / 2 / game.viewZoom;
         const right = game.nodeX + game.canvasWidth / 2 / game.viewZoom;
@@ -2903,7 +2922,10 @@ class Cell {
         this.drawTime = game.timestamp;
         this.updatePos();
         let renderSize = this.size;
-        if (renderSize === 0) renderSize = 20;
+        if (!(renderSize > 0) || renderSize > 4000) {
+            ctx.restore();
+            return;
+        }
 
         ctx.lineWidth = closebord ? 0 : 10;
         ctx.lineCap = "round";
