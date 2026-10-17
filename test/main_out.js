@@ -581,7 +581,10 @@ setSpect() {
     updateServerHash(url) {
         const hash = resolveServerKey(url);
         const q = location.search || "";
-        history.replaceState(null, "", "/" + q + "#" + hash);
+        let path = location.pathname || "/";
+        if (/\/index\.html$/i.test(path)) path = path.slice(0, -"index.html".length);
+        else if (!path.endsWith("/")) path += "/";
+        history.replaceState(null, "", path + q + "#" + hash);
     }
     syncGamemodeSelect(url) {
         syncGamemodeUI(url);
