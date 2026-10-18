@@ -2277,7 +2277,18 @@ setSpect() {
             node.setSize(size);
             node.updateTime = this.timestamp;
             node.flag = spiked;
+            if (pid) node.playerId = pid;
             if (packetName) node.setName(packetName);
+            if (pid && (packetName || color)) {
+                const list = this.nodelist;
+                for (let i = 0; i < list.length; i++) {
+                    const other = list[i];
+                    if (!other || other === node || other.isFood || other.isVirus || other.isEjected) continue;
+                    if ((other.playerId >>> 0) !== pid) continue;
+                    other.color = color;
+                    if (packetName && other.name !== packetName) other.setName(packetName);
+                }
+            }
             if (packetName && pid === (this.ownerPlayerId >>> 0)) this.applyOwnAdminPanel(packetName);
         }
     }
