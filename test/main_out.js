@@ -1391,11 +1391,20 @@ setSpect() {
             if (64 <= msg * msg + b * b && !(.01 > Math.abs(this.oldX - this.X) && .01 > Math.abs(this.oldY - this.Y))) {
                 this.oldX = this.X;
                 this.oldY = this.Y;
-                msg = this.prepareData(21);
-                msg.setUint8(0, 16);
-                msg.setFloat64(1, this.X, true);
-                msg.setFloat64(9, this.Y, true);
-                msg.setUint32(17, 0, true);
+                const ix = Math.round(this.X);
+                const iy = Math.round(this.Y);
+                if (ix >= -32768 && ix <= 32767 && iy >= -32768 && iy <= 32767) {
+                    msg = this.prepareData(5);
+                    msg.setUint8(0, 16);
+                    msg.setInt16(1, ix, true);
+                    msg.setInt16(3, iy, true);
+                } else {
+                    msg = this.prepareData(13);
+                    msg.setUint8(0, 16);
+                    msg.setInt32(1, ix, true);
+                    msg.setInt32(5, iy, true);
+                    msg.setUint32(9, 0, true);
+                }
                 this.wsSend(msg);
             }
         }
@@ -2445,7 +2454,7 @@ setSpect() {
     }
 
     const addedFood = new Set();
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(128)) {
         const foodCount = reader.uint16();
         for (let f = 0; f < foodCount; f++) {
             if (reader.offset + 2 > reader.byteLength) break;
@@ -2524,7 +2533,7 @@ setSpect() {
         virus.updateTime = this.timestamp;
     };
 
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(256)) {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 8 > reader.byteLength) break;
@@ -2536,7 +2545,7 @@ setSpect() {
             placeVirus(virusId, posX, posY, size, true);
         }
     }
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(512)) {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 4 > reader.byteLength) break;
@@ -2548,7 +2557,7 @@ setSpect() {
             moveVirus(virusId, virus.nx + dx, virus.ny + dy, null);
         }
     }
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(1024)) {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 6 > reader.byteLength) break;
@@ -2561,7 +2570,7 @@ setSpect() {
             moveVirus(virusId, virus.nx + dx, virus.ny + dy, size);
         }
     }
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(2048)) {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 6 > reader.byteLength) break;
@@ -2571,7 +2580,7 @@ setSpect() {
             moveVirus(virusId, posX, posY, null);
         }
     }
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(4096)) {
         const virusCount = reader.uint16();
         for (let v = 0; v < virusCount; v++) {
             if (reader.offset + 8 > reader.byteLength) break;
@@ -2611,7 +2620,7 @@ setSpect() {
         if (eject.name) eject.setName("");
     };
 
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(8192)) {
         const ejectCount = reader.uint16();
         for (let e = 0; e < ejectCount; e++) {
             if (reader.offset + 11 > reader.byteLength) break;
@@ -2625,7 +2634,7 @@ setSpect() {
             placeEject(ejectId, posX, posY, "#" + (r << 16 | g << 8 | b).toString(16).padStart(6, "0"), true);
         }
     }
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(16384)) {
         const ejectCount = reader.uint16();
         for (let e = 0; e < ejectCount; e++) {
             if (reader.offset + 6 > reader.byteLength) break;
@@ -2637,7 +2646,7 @@ setSpect() {
             placeEject(ejectId, eject.nx + dx, eject.ny + dy, null, false);
         }
     }
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(32768)) {
         const ejectCount = reader.uint16();
         for (let e = 0; e < ejectCount; e++) {
             if (reader.offset + 8 > reader.byteLength) break;
@@ -2648,22 +2657,7 @@ setSpect() {
         }
     }
 
-    if (reader.offset + 2 <= reader.byteLength) {
-        const idleVirus = reader.uint16();
-        for (let i = 0; i < idleVirus; i++) {
-            if (reader.offset + 2 > reader.byteLength) break;
-            reader.uint16();
-        }
-    }
-    if (reader.offset + 2 <= reader.byteLength) {
-        const idleEject = reader.uint16();
-        for (let i = 0; i < idleEject; i++) {
-            if (reader.offset + 4 > reader.byteLength) break;
-            reader.uint32();
-        }
-    }
-
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(65536)) {
         const foodGone = reader.uint16();
         for (let i = 0; i < foodGone; i++) {
             if (reader.offset + 2 > reader.byteLength) break;
@@ -2673,7 +2667,7 @@ setSpect() {
             if (food) food.destroy();
         }
     }
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(131072)) {
         const virusGone = reader.uint16();
         for (let i = 0; i < virusGone; i++) {
             if (reader.offset + 2 > reader.byteLength) break;
@@ -2683,11 +2677,15 @@ setSpect() {
             if (virus) virus.destroy();
         }
     }
-    while (reader.canRead) {
-        const removeId = reader.uint32();
-        if (addedFood.has(removeId)) continue;
-        const node = this.nodes[removeId];
-        if (node) node.destroy();
+    if (worldHas(262144)) {
+        const goneCount = reader.uint16();
+        for (let i = 0; i < goneCount; i++) {
+            if (reader.offset + 4 > reader.byteLength) break;
+            const removeId = reader.uint32();
+            if (addedFood.has(removeId)) continue;
+            const node = this.nodes[removeId];
+            if (node) node.destroy();
+        }
     }
 
     this.nodelist.sort((a, b) => a.size === b.size ? a.id - b.id : a.size - b.size);
