@@ -2201,7 +2201,9 @@ setSpect() {
         killedNode.updateTime = this.timestamp;
     }
 
-    if (reader.offset + 2 <= reader.byteLength) {
+    const worldMask = reader.offset + 4 <= reader.byteLength ? reader.uint32() : 0;
+    const worldHas = bit => (worldMask & bit) !== 0;
+    if (worldHas(1)) {
         const fullCount = reader.uint16();
         for (let p = 0; p < fullCount; p++) {
             if (reader.offset + 18 > reader.byteLength) break;
@@ -2271,7 +2273,25 @@ setSpect() {
         }
     }
 
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(2)) {
+        const stepCount = reader.uint16();
+        for (let p = 0; p < stepCount; p++) {
+            if (reader.offset + 6 > reader.byteLength) break;
+            const nodeid = reader.uint32();
+            const dx = reader.int8();
+            const dy = reader.int8();
+            const node = this.nodes[nodeid];
+            if (!node || node.isFood || node.isVirus || node.isEjected) continue;
+            node.updatePos();
+            node.ox = node.x;
+            node.oy = node.y;
+            node.oSize = node.size;
+            node.nx += dx;
+            node.ny += dy;
+            node.updateTime = this.timestamp;
+        }
+    }
+    if (worldHas(4)) {
         const deltaCount = reader.uint16();
         for (let p = 0; p < deltaCount; p++) {
             if (reader.offset + 8 > reader.byteLength) break;
@@ -2292,7 +2312,25 @@ setSpect() {
         }
     }
 
-    if (reader.offset + 2 <= reader.byteLength) {
+    if (worldHas(8)) {
+        const placeCount = reader.uint16();
+        for (let p = 0; p < placeCount; p++) {
+            if (reader.offset + 8 > reader.byteLength) break;
+            const nodeid = reader.uint32();
+            const posX = reader.int16();
+            const posY = reader.int16();
+            const node = this.nodes[nodeid];
+            if (!node || node.isFood || node.isVirus || node.isEjected) continue;
+            node.updatePos();
+            node.ox = node.x;
+            node.oy = node.y;
+            node.oSize = node.size;
+            node.nx = posX;
+            node.ny = posY;
+            node.updateTime = this.timestamp;
+        }
+    }
+    if (worldHas(16)) {
         const moveCount = reader.uint16();
         for (let p = 0; p < moveCount; p++) {
             if (reader.offset + 10 > reader.byteLength) break;
@@ -2312,8 +2350,23 @@ setSpect() {
             node.updateTime = this.timestamp;
         }
     }
-
-    for (let nodeid; (nodeid = reader.uint32());) {
+    if (worldHas(32)) {
+        const sizeCount = reader.uint16();
+        for (let p = 0; p < sizeCount; p++) {
+            if (reader.offset + 6 > reader.byteLength) break;
+            const nodeid = reader.uint32();
+            const size = reader.uint16();
+            const node = this.nodes[nodeid];
+            if (!node || node.isFood || node.isVirus || node.isEjected) continue;
+            node.updatePos();
+            node.ox = node.x;
+            node.oy = node.y;
+            node.oSize = node.size;
+            node.setSize(size);
+            node.updateTime = this.timestamp;
+        }
+    }
+    if (worldHas(64)) for (let nodeid; (nodeid = reader.uint32());) {
         const type = reader.uint8();
         let posX = 0;
         let posY = 0;
