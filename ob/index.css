@@ -1,0 +1,519 @@
+@import url('./menu_extracted.css');
+@import url('./menu_overrides.css');
+
+@font-face {
+  font-family: 'Ubuntu';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/ubuntu/v21/4iCs6KVjbNBYlgo6eA.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Ubuntu';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf') format('truetype');
+}
+
+body {
+  font-family: 'Ubuntu', sans-serif;
+  font-weight: 400;
+  color: #343434;
+}
+
+body {
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+}
+
+#background {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("./img/background.png");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+  z-index: 2;
+}
+
+#overlays {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 200;
+}
+
+#overlays.overlays-visible {
+    display: block;
+}
+
+#canvas {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* PC minimap (bottom-right) — like agar.su client */
+#map {
+    display: none;
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 35;
+    width: 150px;
+    height: 150px;
+    padding: 5px;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 18px;
+    background: rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+#map.is-visible {
+    display: block;
+}
+@media (max-width: 767px) {
+    #map { display: none !important; }
+}
+.map-container {
+    width: 140px;
+    height: 140px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    place-items: center;
+    position: relative;
+    overflow: hidden;
+}
+.map-container > div {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.55);
+    font-family: Ubuntu, "Segoe UI", sans-serif;
+    line-height: 1;
+}
+#mapposition {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 10px;
+    height: 10px;
+    margin: 0;
+    background: #1a73e8;
+    border-radius: 50%;
+    will-change: transform;
+    pointer-events: none;
+    z-index: 2;
+}
+
+#chat_textbox {
+    transition: all .5s ease-in-out;
+    position: absolute;
+    z-index: 1;
+    bottom: 10px;
+    background: rgba(0, 0, 0, .2);
+    border: 0;
+    outline: none;
+    color: #FFF;
+    height: 30px;
+    text-indent: 12px;
+    left: 10px;
+    width: 300px;
+    font-family: 'Ubuntu', sans-serif;
+    font-weight: 400;
+}
+
+#chat_textbox:focus {
+    background: rgba(0, 0, 0, .5);
+}
+
+#connecting,
+#disconnected {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    background-color: rgba(0,0,0,0.5);
+}
+
+#disconnected .connecting-box {
+    text-align: center;
+}
+
+#disconnect-status {
+    margin: 8px 0 14px;
+    font-size: 14px;
+    color: #333;
+}
+
+.connecting-box {
+    width: 350px;
+    background-color: #FFFFFF;
+    margin: 100px auto;
+    border-radius: 15px;
+    padding: 8px 15px 12px;
+}
+
+#connect-status {
+    margin: 8px 0 10px;
+    font-size: 14px;
+    color: #333;
+}
+
+.connect-progress-wrap {
+    width: 100%;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+#connect-progress {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #337ab7, #5bc0de);
+    border-radius: 4px;
+    transition: width 0.2s ease;
+}
+
+.connect-verify-data-stream {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 11px;
+    color: #337ab7;
+    margin: 0 0 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#reconnect-btn {
+    width: 100%;
+    height: 36px;
+    border: 0;
+    border-radius: 5px;
+    background: #54c800;
+    color: #fff;
+    font-family: 'Ubuntu', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+#reconnect-btn:hover {
+    background: #347F01;
+}
+header#mainui-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 30px;
+  z-index: 300;
+  pointer-events: none;
+}
+
+header#mainui-header.hidden {
+  display: none;
+}
+
+.tosBox {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  background-color: #FFF;
+  padding: 5px 10px;
+  font-size: 12px;
+  pointer-events: auto;
+  font-family: 'Ubuntu', sans-serif;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.tosBox.left {
+  left: 0;
+  border-radius: 0 0 5px 0;
+}
+
+.tosBox.right {
+  right: 0;
+  border-radius: 0 0 0 5px;
+}
+
+.tosBox a.text-muted {
+  color: #777;
+  text-decoration: none;
+}
+
+.tosBox a.text-muted:hover {
+  color: #555;
+  text-decoration: underline;
+}
+
+.tosBox .tos-sep {
+  color: #777;
+  margin: 0 6px;
+  user-select: none;
+}
+
+:root {
+  --rtb-inset: 16px;
+  --rtb-menu-width: 985px;
+  --rtb-side-width: 0px;
+  --rtb-side-height: 0px;
+  --rtb-side-top: 0px;
+  --rtb-bottom-height: 0px;
+  --rtb-gap: 12px;
+}
+
+#overlays .rtb-sidebar,
+#overlays .rtb-bottom {
+  position: absolute;
+  z-index: 0;
+  background-color: #fff;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: auto;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+#overlays .rtb-sidebar {
+  top: var(--rtb-side-top);
+  bottom: auto;
+  height: var(--rtb-side-height);
+  width: var(--rtb-side-width);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+#overlays .rtb-sidebar.rtb-visible {
+  display: flex;
+}
+
+#overlays .rtb-sidebar-left {
+  left: var(--rtb-inset);
+}
+
+#overlays .rtb-sidebar-right {
+  right: var(--rtb-inset);
+}
+
+#overlays .rtb-bottom {
+  left: 50%;
+  right: auto;
+  width: var(--rtb-menu-width);
+  transform: translateX(-50%);
+  bottom: var(--rtb-inset);
+  height: var(--rtb-bottom-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#overlays .rtb-ad-slot {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+#overlays .rtb-ad-slot > * {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#overlays #helloDialog {
+  z-index: 1;
+}
+
+/* Tournament announcement banner — light, centered */
+.tournament-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+.tournament-banner.is-hidden {
+  display: none;
+}
+
+.tournament-banner-card {
+  position: relative;
+  width: min(560px, 100%);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #d8d8d8;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  animation: tournament-banner-in 0.4s ease-out;
+}
+
+@keyframes tournament-banner-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.tournament-banner-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #666;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.tournament-banner-close:hover {
+  background: #fff;
+  border-color: #999;
+  color: #333;
+}
+
+.tournament-banner-hero {
+  background: #f4f4f4;
+  line-height: 0;
+}
+
+.tournament-banner-hero img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+.tournament-banner-body {
+  padding: 16px 20px 20px;
+  text-align: center;
+  color: #343434;
+  background: #fff;
+}
+
+.tournament-banner-desc,
+.tournament-banner-prize {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #5a5a5a;
+  font-weight: 400;
+}
+
+.tournament-banner-desc strong {
+  color: #222;
+  font-weight: 700;
+}
+
+.tournament-banner-prize {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #7d7d7d;
+}
+
+.tournament-banner-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.tournament-banner .btn-play.tournament-banner-apply {
+  position: static;
+  top: auto;
+  display: block;
+  width: 243px;
+  max-width: 100%;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 34px;
+  text-align: center;
+  text-decoration: none;
+  color: #fff;
+  background-color: #54c800;
+  border: 1px solid #54c800;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.tournament-banner .btn-play.tournament-banner-apply:hover,
+.tournament-banner .btn-play.tournament-banner-apply:focus {
+  text-decoration: none;
+  color: #fff;
+  background-color: #347f01;
+  border-color: #347f01;
+}
+
+.tournament-banner-links {
+  font-size: 13px;
+  color: #7d7d7d;
+}
+
+.tournament-banner-links a {
+  color: #428bca;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.tournament-banner-links a:hover {
+  text-decoration: underline;
+}
+
+.tournament-banner-links span {
+  margin: 0 6px;
+  color: #bbb;
+}
+
+@media (max-width: 480px) {
+  .tournament-banner-body {
+    padding: 12px 14px 16px;
+  }
+  .tournament-banner .btn-play.tournament-banner-apply {
+    width: 100%;
+    font-size: 18px;
+  }
+}
