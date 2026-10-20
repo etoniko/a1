@@ -48,7 +48,47 @@
     
     <!-- Permissions Policy (как было) -->
     <meta http-equiv="Permissions-Policy" content="microphone=(), camera=(), geolocation=(), display-capture=(), window-management=(), local-fonts=(), serial=(), usb=(), hid=(), bluetooth=()">
-    
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const message = document.createElement("div");
+
+  message.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: red;
+    font-size: 28px;
+    font-weight: bold;
+    text-align: center;
+    z-index: 9999;
+  `;
+
+  let seconds = 5;
+
+  function updateMessage() {
+    message.innerHTML = `
+      обновление, переход в Agar.su<br>
+      ${seconds}
+    `;
+  }
+
+  document.body.appendChild(message);
+  updateMessage();
+
+  const timer = setInterval(function () {
+    seconds--;
+
+    if (seconds <= 0) {
+      clearInterval(timer);
+      window.location.href = "https://agar.su/";
+      return;
+    }
+
+    updateMessage();
+  }, 1000);
+});
+</script>
     <script>
     (function () {
         function deny() {
