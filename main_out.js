@@ -364,7 +364,11 @@ class Game {
         this.bottomPos = 0;
         this.foodMinSize = 0;
         this.foodMaxSize = 0;
+        this.foodMass = 1;
+        this.foodMaxMass = 4;
+        this.mapBoundsReady = false;
         this.ownerPlayerId = -1;
+        this.ua = false;
         // Игрок и клетки
         this.playerCells = [];
         this.nodes = {};
@@ -1004,6 +1008,8 @@ setSpect() {
         this.Cells = [];
         this.leaderBoard = [];
         this._myLbNodeId = null;
+        this.mapBoundsReady = false;
+        this.ua = false;
     }
     manualReconnect() {
         if (this.connectInProgress) return;
@@ -1242,7 +1248,21 @@ setSpect() {
                 this.updateNodes(reader);
                 break;
             case 17:
-                this.posSize = 0.15;
+                if (msg.byteLength >= offset + 12) {
+                    const cx = msg.getFloat32(offset, true);
+                    offset += 4;
+                    const cy = msg.getFloat32(offset, true);
+                    offset += 4;
+                    const csize = msg.getFloat32(offset, true);
+                    offset += 4;
+                    if (this.playerCells.length === 0) {
+                        this.posX = cx;
+                        this.posY = cy;
+                        if (csize > 0) this.posSize = csize;
+                    }
+                } else {
+                    this.posSize = 0.15;
+                }
                 break;
             case 20:
                 this.playerCells = [];
@@ -1298,12 +1318,16 @@ setSpect() {
                 offset += 8;
                 this.bottomPos = msg.getFloat64(offset, true);
                 offset += 8;
-                this.foodMinSize = (msg.getUint16(offset, true) * 100) ** .5;
+                this.foodMass = msg.getUint16(offset, true);
                 offset += 2;
-                this.foodMaxSize = (msg.getUint16(offset, true) * 100) ** .5;
+                this.foodMaxMass = msg.getUint16(offset, true);
                 offset += 2;
+                this.foodMinSize = Math.ceil(Math.sqrt(100 * this.foodMass));
+                this.foodMaxSize = Math.ceil(Math.sqrt(100 * this.foodMaxMass));
                 this.ownerPlayerId = msg.getUint32(offset, true);
                 offset += 4;
+                this.mapBoundsReady = true;
+                this.repositionFoodNodes();
                 this.mapWidth = (this.rightPos + this.leftPos) / 2;
                 this.mapHeight = (this.bottomPos + this.topPos) / 2;
                 this.posX = (this.rightPos + this.leftPos) / 2;
@@ -1313,6 +1337,11 @@ setSpect() {
                     this.nodeX = this.posX;
                     this.nodeY = this.posY;
                     this.viewZoom = this.posSize;
+                    this.X = this.posX;
+                    this.Y = this.posY;
+                    this.oldX = this.posX - 999;
+                    this.oldY = this.posY - 999;
+                    this.sendMouseMove();
                 }
                 break;
             case 99:
@@ -1366,21 +1395,40 @@ setSpect() {
         });
         this.drawChatBoard();
     }
+    sendAim(x, y) {
+        const ix = Math.round(x);
+        const iy = Math.round(y);
+        let msg;
+        if (ix >= -32768 && ix <= 32767 && iy >= -32768 && iy <= 32767) {
+            msg = this.prepareData(5);
+            msg.setUint8(0, 16);
+            msg.setInt16(1, ix, true);
+            msg.setInt16(3, iy, true);
+        } else {
+            msg = this.prepareData(13);
+            msg.setUint8(0, 16);
+            msg.setInt32(1, ix, true);
+            msg.setInt32(5, iy, true);
+            msg.setUint32(9, 0, true);
+        }
+        this.wsSend(msg);
+    }
     sendMouseMove() {
-        var msg;
-        if (this.wsIsOpen()) {
-            msg = this.rawMouseX - this.canvasWidth / 2;
-            var b = this.rawMouseY - this.canvasHeight / 2;
-            if (64 <= msg * msg + b * b && !(.01 > Math.abs(this.oldX - this.X) && .01 > Math.abs(this.oldY - this.Y))) {
+        if (!this.wsIsOpen() || !this.mapBoundsReady) return;
+        if (this.playerCells.length === 0) {
+            if (!(Math.abs(this.oldX - this.X) < 0.05 && Math.abs(this.oldY - this.Y) < 0.05)) {
                 this.oldX = this.X;
                 this.oldY = this.Y;
-                msg = this.prepareData(21);
-                msg.setUint8(0, 16);
-                msg.setFloat64(1, this.X, true);
-                msg.setFloat64(9, this.Y, true);
-                msg.setUint32(17, 0, true);
-                this.wsSend(msg);
+                this.sendAim(this.X, this.Y);
             }
+            return;
+        }
+        const msgX = this.rawMouseX - this.canvasWidth / 2;
+        const msgY = this.rawMouseY - this.canvasHeight / 2;
+        if (64 <= msgX * msgX + msgY * msgY && !(Math.abs(this.oldX - this.X) < 0.1 && Math.abs(this.oldY - this.Y) < 0.1)) {
+            this.oldX = this.X;
+            this.oldY = this.Y;
+            this.sendAim(this.X, this.Y);
         }
     }
     getColorId(hex) {
@@ -1911,15 +1959,142 @@ setSpect() {
     normalizeFractlPart(n) {
         return (n % (Math.PI * 2)) / (Math.PI * 2);
     }
-   updateNodes(reader) {
-    this.timestamp = Date.now();
-    this.ua = false;
-    
-    for (let killedId; (killedId = reader.uint32());) {
-        const killer = this.nodes[reader.uint32()];
-        const killedNode = this.nodes[killedId];
-        if (killer && killedNode) {
+    rgbHex(r, g, b) {
+        return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+    }
+    computeFoodPosition(nodeid) {
+        const w = (this.rightPos - this.leftPos) || 1;
+        const h = (this.bottomPos - this.topPos) || 1;
+        return {
+            x: this.leftPos + w * this.normalizeFractlPart(nodeid),
+            y: this.topPos + h * this.normalizeFractlPart(nodeid * nodeid)
+        };
+    }
+    foodColorHex(id) {
+        const palette = ["#ff3333", "#ff9900", "#ffe14a", "#33dd44", "#22c8ff", "#4477ff", "#e040fb", "#ff4d88"];
+        return palette[(Math.imul(id | 0, 747796405) >>> 0) % palette.length];
+    }
+    virusColorHex(size) {
+        const s = size | 0;
+        if (s >= 131) return "#ff3200";
+        if (s >= 126) return "#ff6400";
+        if (s >= 121) return "#ff9600";
+        if (s >= 116) return "#ffc800";
+        if (s >= 111) return "#fbff00";
+        if (s >= 105) return "#80ff00";
+        return "#00ff00";
+    }
+    computeFoodSize() {
+        let mass = this.foodMass | 0;
+        if (!(mass > 0)) {
+            if (this.foodMinSize > 0) mass = Math.max(1, Math.round(this.foodMinSize * this.foodMinSize / 100));
+            else mass = 1;
+        }
+        return Math.ceil(Math.sqrt(100 * mass));
+    }
+    repositionFoodNodes() {
+        if (!this.mapBoundsReady) return;
+        const now = Date.now();
+        for (let i = 0; i < this.nodelist.length; i++) {
+            const node = this.nodelist[i];
+            if (!node || !node.isFood) continue;
+            const pos = this.computeFoodPosition(node.id);
+            const sz = this.computeFoodSize();
+            node.color = this.foodColorHex(node.id);
+            node.ox = pos.x;
+            node.oy = pos.y;
+            node.nx = pos.x;
+            node.ny = pos.y;
+            node.x = pos.x;
+            node.y = pos.y;
+            node.setSize(sz);
+            node.oSize = sz;
+            node.size = sz;
+            node.updateTime = now;
+        }
+    }
+    readSticker(reader) {
+        if (!reader.canRead) return null;
+        const marker = reader.uint8();
+        if (marker === 255) return reader.uint8() || null;
+        if (marker === 0) return false;
+        return null;
+    }
+    applyNodeSticker(node, stickerFromUpdate) {
+        if (!node || stickerFromUpdate == null) return;
+        if (stickerFromUpdate) {
+            node.currentSticker = stickerFromUpdate;
+            node.stickerActive = true;
+        } else {
+            node.currentSticker = null;
+            node.stickerActive = false;
+        }
+    }
+    teamSideFrom(spiked) {
+        if (spiked & 2) return 1;
+        if (spiked & 4) return 2;
+        if (spiked & 8) return 3;
+        if (spiked & 128) return 4;
+        return 0;
+    }
+    noteOwnAdmin(name, playerId) {
+        if (!name || playerId !== this.ownerPlayerId) return;
+        const lowerName = name.toLowerCase().trim();
+        const isAdmin = this.admins && this.admins.some((admin) => lowerName.includes(String(admin).toLowerCase()));
+        const isModer = this.moders && this.moders.some((moder) => lowerName.includes(String(moder).toLowerCase()));
+        const panel = document.querySelector(".adminpanel");
+        if (!panel) return;
+        panel.style.display = "none";
+        if (isAdmin) {
+            panel.style.display = "flex";
+            panel.style.background = "rgb(146, 15, 15)";
+            panel.textContent = "ADMINKA";
+        } else if (isModer) {
+            panel.style.display = "flex";
+            panel.style.background = "rgb(2, 89, 255)";
+            panel.textContent = "MODERKA";
+        }
+    }
+    claimOwnCell(node) {
+        node.isOwn = true;
+        this.hideOverlays();
+        this.playerCells.push(node);
+        if (this.playerCells.length === 1) {
+            this.nodeX = node.x;
+            this.nodeY = node.y;
+            if (window.AgarAds && typeof window.AgarAds.onPlayerSpawn === "function") {
+                window.AgarAds.onPlayerSpawn();
+            }
+        }
+    }
+    applyPacketName(node, packetName) {
+        if (!packetName) return;
+        if (node.name !== packetName || node._txtNameVal !== packetName) {
+            if (node.name === packetName) node._txtNameVal = undefined;
+            node.setName(packetName);
+        }
+    }
+    shiftNode(node, nx, ny, size) {
+        node.updatePos();
+        node.ox = node.x;
+        node.oy = node.y;
+        node.oSize = node.size;
+        node.nx = nx;
+        node.ny = ny;
+        if (size != null) node.setSize(size);
+        node.updateTime = this.timestamp;
+    }
+    updateNodes(reader) {
+        const VIRUS_NODE_BASE = 2147483648;
+        const EJECT_SIZE = 35;
+        this.timestamp = Date.now();
+        this.ua = false;
+        for (let killedId; (killedId = reader.uint32());) {
+            const killer = this.nodes[reader.uint32()];
+            const killedNode = this.nodes[killedId];
+            if (!killedNode) continue;
             killedNode.destroy();
+            if (!killer) continue;
             killedNode.ox = killedNode.x;
             killedNode.oy = killedNode.y;
             killedNode.oSize = killedNode.size;
@@ -1928,128 +2103,428 @@ setSpect() {
             killedNode.nSize = killedNode.size;
             killedNode.updateTime = this.timestamp;
         }
-    }
-    
-    for (let nodeid; (nodeid = reader.uint32());) {
-        const type = reader.uint8();
-        let posX = 0, posY = 0, size = 0, playerId = 0;
-        
-        if (type === 1) {
-            posX = this.leftPos + (this.rightPos * 2) * this.normalizeFractlPart(nodeid);
-            posY = this.topPos + (this.bottomPos * 2) * this.normalizeFractlPart(nodeid * nodeid);
-        } else {
-            if (type === 0) playerId = reader.uint32();
-            posX = reader.int32();
-            posY = reader.int32();
-            size = reader.uint16();
-        }
-        
-        const r = reader.uint8();
-        const g = reader.uint8();
-        const b = reader.uint8();
-        let color = ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
-        color = `#${color}`;
-        
-        const spiked = reader.uint8();
-        const flagVirus = !!(spiked & 0x01);
-        const flagAgitated = !!(spiked & 0x10);
-        const flagEjected = !!(spiked & 0x20) || !!(spiked & 0x40);
-        
-        const name = reader.utf8();
-        
-        // ========== ЧТЕНИЕ СТИКЕРА (ДОБАВИТЬ ЭТОТ БЛОК) ==========
-        let stickerData = null;
-        if (reader.canRead) {
-            const marker = reader.uint8();
-            if (marker === 0xFF) {
-                stickerData = reader.uint8();
-            }
-        }
-        // ========================================================
-        
-        let node = this.nodes[nodeid];
-        if (node) {
-            node.updatePos();
-            node.ox = node.x;
-            node.oy = node.y;
-            node.oSize = node.size;
-            node.color = color;
-        } else {
-            node = new Cell(nodeid, posX, posY, size, color, name);
-            this.nodes[nodeid] = node;
-            this.nodelist.push(node);
-            node.ka = posX;
-            node.la = posY;
-            if (playerId === this.ownerPlayerId) {
-                this.hideOverlays();
-                this.playerCells.push(node);
-                if (this.playerCells.length === 1) {
-                    this.nodeX = node.x;
-                    this.nodeY = node.y;
-                    if (window.AgarAds && typeof window.AgarAds.onPlayerSpawn === "function") {
-                        window.AgarAds.onPlayerSpawn();
-                    }
+        const worldMask = reader.offset + 4 <= reader.byteLength ? reader.uint32() : 0;
+        const worldHas = (bit) => (worldMask & bit) !== 0;
+        const addedFood = new Set();
+        if (worldHas(1)) {
+            const fullCount = reader.uint16();
+            for (let p = 0; p < fullCount; p++) {
+                if (reader.offset + 18 > reader.byteLength) break;
+                const nodeid = reader.uint32();
+                const playerId = reader.uint32();
+                const posX = reader.int16();
+                const posY = reader.int16();
+                const size = reader.uint16();
+                const r = reader.uint8();
+                const g = reader.uint8();
+                const b = reader.uint8();
+                const spiked = reader.uint8();
+                const color = this.rgbHex(r, g, b);
+                const packetName = reader.utf8();
+                const stickerFromUpdate = this.readSticker(reader);
+                const pid = playerId ? playerId >>> 0 : 0;
+                let node = this.nodes[nodeid];
+                if (node) {
+                    node.updatePos();
+                    node.ox = node.x;
+                    node.oy = node.y;
+                    node.oSize = node.size;
+                    node.color = color;
+                } else {
+                    node = new Cell(nodeid, posX, posY, size, color, packetName);
+                    this.nodelist.push(node);
+                    this.nodes[nodeid] = node;
+                    node.ka = posX;
+                    node.la = posY;
+                    if (pid && pid === this.ownerPlayerId) this.claimOwnCell(node);
                 }
+                if (pid) node.playerId = pid;
+                this.applyNodeSticker(node, stickerFromUpdate);
+                node.isVirus = !!(spiked & 1);
+                node.isEjected = !!(spiked & 32) || !!(spiked & 64);
+                node.isAgitated = !!(spiked & 16);
+                node.isFood = false;
+                node.nx = posX;
+                node.ny = posY;
+                node.setSize(size);
+                node.updateTime = this.timestamp;
+                node.flag = spiked;
+                node.teamSide = this.teamSideFrom(spiked);
+                this.applyPacketName(node, packetName);
+                this.noteOwnAdmin(packetName || node.name, pid);
             }
         }
-        
-        // ========== УСТАНОВКА СТИКЕРА ==========
-        if (stickerData !== null) {
-            node.currentSticker = stickerData;
-            node.stickerActive = true;
-        } else if (node) {
-            node.stickerActive = false;
-            node.currentSticker = null;
+        if (worldHas(2)) {
+            const stepCount = reader.uint16();
+            for (let p = 0; p < stepCount; p++) {
+                if (reader.offset + 6 > reader.byteLength) break;
+                const nodeid = reader.uint32();
+                const dx = reader.int8();
+                const dy = reader.int8();
+                const node = this.nodes[nodeid];
+                if (!node || node.isFood || node.isVirus || node.isEjected) continue;
+                node.updatePos();
+                node.ox = node.x;
+                node.oy = node.y;
+                node.oSize = node.size;
+                node.nx += dx;
+                node.ny += dy;
+                node.updateTime = this.timestamp;
+            }
         }
-        // =======================================
-        
-        node.isVirus = flagVirus;
-        node.isEjected = flagEjected;
-        node.isAgitated = flagAgitated;
-        node.nx = posX;
-        node.ny = posY;
-        node.setSize(size);
-        node.updateTime = this.timestamp;
-        node.flag = spiked;
-        if (name) node.setName(name);
-        
-        // Админ-панель (если нужно)
-        if (name && playerId === this.ownerPlayerId) {
-            const lowerName = name.toLowerCase().trim();
-            const isAdmin = this.admins?.some(admin => lowerName.includes(admin.toLowerCase()));
-            const isModer = this.moders?.some(moder => lowerName.includes(moder.toLowerCase()));
-            const panel = document.querySelector('.adminpanel');
-            if (panel) {
-                panel.style.display = 'none';
-                if (isAdmin) {
-                    panel.style.display = 'flex';
-                    panel.style.background = 'rgb(146, 15, 15)';
-                    panel.textContent = 'ADMINKA';
-                } else if (isModer) {
-                    panel.style.display = 'flex';
-                    panel.style.background = 'rgb(2, 89, 255)';
-                    panel.textContent = 'MODERKA';
+        if (worldHas(4)) {
+            const deltaCount = reader.uint16();
+            for (let p = 0; p < deltaCount; p++) {
+                if (reader.offset + 8 > reader.byteLength) break;
+                const nodeid = reader.uint32();
+                const dx = reader.int8();
+                const dy = reader.int8();
+                const size = reader.uint16();
+                const node = this.nodes[nodeid];
+                if (!node || node.isFood || node.isVirus || node.isEjected) continue;
+                node.updatePos();
+                node.ox = node.x;
+                node.oy = node.y;
+                node.oSize = node.size;
+                node.nx += dx;
+                node.ny += dy;
+                node.setSize(size);
+                node.updateTime = this.timestamp;
+            }
+        }
+        if (worldHas(8)) {
+            const placeCount = reader.uint16();
+            for (let p = 0; p < placeCount; p++) {
+                if (reader.offset + 8 > reader.byteLength) break;
+                const nodeid = reader.uint32();
+                const posX = reader.int16();
+                const posY = reader.int16();
+                const node = this.nodes[nodeid];
+                if (!node || node.isFood || node.isVirus || node.isEjected) continue;
+                this.shiftNode(node, posX, posY, null);
+            }
+        }
+        if (worldHas(16)) {
+            const moveCount = reader.uint16();
+            for (let p = 0; p < moveCount; p++) {
+                if (reader.offset + 10 > reader.byteLength) break;
+                const nodeid = reader.uint32();
+                const posX = reader.int16();
+                const posY = reader.int16();
+                const size = reader.uint16();
+                const node = this.nodes[nodeid];
+                if (!node || node.isFood || node.isVirus || node.isEjected) continue;
+                this.shiftNode(node, posX, posY, size);
+            }
+        }
+        if (worldHas(32)) {
+            const sizeCount = reader.uint16();
+            for (let p = 0; p < sizeCount; p++) {
+                if (reader.offset + 6 > reader.byteLength) break;
+                const nodeid = reader.uint32();
+                const size = reader.uint16();
+                const node = this.nodes[nodeid];
+                if (!node || node.isFood || node.isVirus || node.isEjected) continue;
+                node.updatePos();
+                node.ox = node.x;
+                node.oy = node.y;
+                node.oSize = node.size;
+                node.setSize(size);
+                node.updateTime = this.timestamp;
+            }
+        }
+        if (worldHas(64)) {
+            for (let nodeid; (nodeid = reader.uint32());) {
+                const type = reader.uint8();
+                let posX = 0;
+                let posY = 0;
+                let size = 0;
+                let playerId = 0;
+                if (type === 1) {
+                    const foodPos = this.computeFoodPosition(nodeid);
+                    posX = foodPos.x;
+                    posY = foodPos.y;
+                    size = this.computeFoodSize();
+                } else {
+                    if (type === 0) playerId = reader.uint32();
+                    posX = reader.int32();
+                    posY = reader.int32();
+                    size = reader.uint16();
                 }
+                const r = reader.uint8();
+                const g = reader.uint8();
+                const b = reader.uint8();
+                let color = this.rgbHex(r, g, b);
+                const spiked = reader.uint8();
+                const packetName = reader.utf8();
+                const stickerFromUpdate = this.readSticker(reader);
+                const pid = type === 0 && playerId ? playerId >>> 0 : 0;
+                let node = this.nodes[nodeid];
+                if (node) {
+                    node.updatePos();
+                    node.ox = node.x;
+                    node.oy = node.y;
+                    node.oSize = node.size;
+                    node.color = color;
+                } else {
+                    node = new Cell(nodeid, posX, posY, size, color, packetName);
+                    this.nodelist.push(node);
+                    this.nodes[nodeid] = node;
+                    node.ka = posX;
+                    node.la = posY;
+                    if (pid && pid === this.ownerPlayerId) this.claimOwnCell(node);
+                }
+                if (pid) node.playerId = pid;
+                this.applyNodeSticker(node, stickerFromUpdate);
+                node.isVirus = !!(spiked & 1);
+                node.isEjected = !!(spiked & 32) || !!(spiked & 64);
+                node.isAgitated = !!(spiked & 16);
+                node.isFood = type === 1 || type === 4;
+                node.nx = posX;
+                node.ny = posY;
+                node.setSize(size);
+                node.updateTime = this.timestamp;
+                node.flag = spiked;
+                node.teamSide = this.teamSideFrom(spiked);
+                this.applyPacketName(node, packetName);
+                if (type === 1) node.color = this.foodColorHex(nodeid);
+                this.noteOwnAdmin(packetName || node.name, pid);
+            }
+        }
+        if (worldHas(128)) {
+            const foodCount = reader.uint16();
+            for (let f = 0; f < foodCount; f++) {
+                if (reader.offset + 2 > reader.byteLength) break;
+                const foodId = reader.uint16();
+                addedFood.add(foodId);
+                const foodPos = this.computeFoodPosition(foodId);
+                const foodSize = this.computeFoodSize();
+                const foodColor = this.foodColorHex(foodId);
+                let food = this.nodes[foodId];
+                if (food) {
+                    food.updatePos();
+                    food.ox = food.x;
+                    food.oy = food.y;
+                    food.oSize = food.size;
+                } else {
+                    food = new Cell(foodId, foodPos.x, foodPos.y, foodSize, foodColor, "");
+                    this.nodelist.push(food);
+                    this.nodes[foodId] = food;
+                    food.ka = foodPos.x;
+                    food.la = foodPos.y;
+                }
+                food.color = foodColor;
+                food.isFood = true;
+                food.isVirus = false;
+                food.isEjected = false;
+                food.nx = foodPos.x;
+                food.ny = foodPos.y;
+                food.setSize(foodSize);
+                food.updateTime = this.timestamp;
+                food.flag = 0;
+            }
+        }
+        const placeVirus = (virusId, posX, posY, size, isNew) => {
+            const virusColor = this.virusColorHex(size);
+            let virus = this.nodes[virusId];
+            if (virus && virus.isVirus) {
+                virus.updatePos();
+                virus.ox = virus.x;
+                virus.oy = virus.y;
+                virus.oSize = virus.size;
+            } else if (isNew) {
+                virus = new Cell(virusId, posX, posY, size, virusColor, "");
+                this.nodelist.push(virus);
+                this.nodes[virusId] = virus;
+                virus.ka = posX;
+                virus.la = posY;
+            } else return;
+            virus.color = virusColor;
+            virus.isVirus = true;
+            virus.isFood = false;
+            virus.isEjected = false;
+            virus.isAgitated = false;
+            virus.nx = posX;
+            virus.ny = posY;
+            virus.setSize(size);
+            virus.updateTime = this.timestamp;
+            virus.flag = 1;
+            virus.teamSide = 0;
+            if (virus.name) virus.setName("");
+        };
+        const moveVirus = (virusId, posX, posY, size) => {
+            const virus = this.nodes[virusId];
+            if (!virus || !virus.isVirus) return;
+            virus.updatePos();
+            virus.ox = virus.x;
+            virus.oy = virus.y;
+            virus.oSize = virus.size;
+            virus.nx = posX;
+            virus.ny = posY;
+            if (size != null) {
+                virus.setSize(size);
+                virus.color = this.virusColorHex(size);
+            }
+            virus.updateTime = this.timestamp;
+        };
+        if (worldHas(256)) {
+            const virusCount = reader.uint16();
+            for (let v = 0; v < virusCount; v++) {
+                if (reader.offset + 8 > reader.byteLength) break;
+                const virusId = VIRUS_NODE_BASE + reader.uint16();
+                const posX = reader.int16();
+                const posY = reader.int16();
+                const size = reader.uint16();
+                addedFood.add(virusId);
+                placeVirus(virusId, posX, posY, size, true);
+            }
+        }
+        if (worldHas(512)) {
+            const virusCount = reader.uint16();
+            for (let v = 0; v < virusCount; v++) {
+                if (reader.offset + 4 > reader.byteLength) break;
+                const virusId = VIRUS_NODE_BASE + reader.uint16();
+                const virus = this.nodes[virusId];
+                const dx = reader.int8();
+                const dy = reader.int8();
+                if (!virus || !virus.isVirus) continue;
+                moveVirus(virusId, virus.nx + dx, virus.ny + dy, null);
+            }
+        }
+        if (worldHas(1024)) {
+            const virusCount = reader.uint16();
+            for (let v = 0; v < virusCount; v++) {
+                if (reader.offset + 6 > reader.byteLength) break;
+                const virusId = VIRUS_NODE_BASE + reader.uint16();
+                const virus = this.nodes[virusId];
+                const dx = reader.int8();
+                const dy = reader.int8();
+                const size = reader.uint16();
+                if (!virus || !virus.isVirus) continue;
+                moveVirus(virusId, virus.nx + dx, virus.ny + dy, size);
+            }
+        }
+        if (worldHas(2048)) {
+            const virusCount = reader.uint16();
+            for (let v = 0; v < virusCount; v++) {
+                if (reader.offset + 6 > reader.byteLength) break;
+                const virusId = VIRUS_NODE_BASE + reader.uint16();
+                const posX = reader.int16();
+                const posY = reader.int16();
+                moveVirus(virusId, posX, posY, null);
+            }
+        }
+        if (worldHas(4096)) {
+            const virusCount = reader.uint16();
+            for (let v = 0; v < virusCount; v++) {
+                if (reader.offset + 8 > reader.byteLength) break;
+                const virusId = VIRUS_NODE_BASE + reader.uint16();
+                const posX = reader.int16();
+                const posY = reader.int16();
+                const size = reader.uint16();
+                moveVirus(virusId, posX, posY, size);
+            }
+        }
+        const placeEject = (ejectId, posX, posY, ejectColor, isNew) => {
+            let eject = this.nodes[ejectId];
+            if (eject && eject.isEjected) {
+                eject.updatePos();
+                eject.ox = eject.x;
+                eject.oy = eject.y;
+                eject.oSize = eject.size;
+            } else if (isNew) {
+                eject = new Cell(ejectId, posX, posY, EJECT_SIZE, ejectColor, "");
+                this.nodelist.push(eject);
+                this.nodes[ejectId] = eject;
+                eject.ka = posX;
+                eject.la = posY;
+            } else return;
+            if (ejectColor) eject.color = ejectColor;
+            eject.isEjected = true;
+            eject.isVirus = false;
+            eject.isFood = false;
+            eject.isAgitated = false;
+            eject.nx = posX;
+            eject.ny = posY;
+            eject.setSize(EJECT_SIZE);
+            eject.updateTime = this.timestamp;
+            eject.flag = 0;
+            eject.teamSide = 0;
+            if (eject.name) eject.setName("");
+        };
+        if (worldHas(8192)) {
+            const ejectCount = reader.uint16();
+            for (let e = 0; e < ejectCount; e++) {
+                if (reader.offset + 11 > reader.byteLength) break;
+                const ejectId = reader.uint32();
+                const posX = reader.int16();
+                const posY = reader.int16();
+                const r = reader.uint8();
+                const g = reader.uint8();
+                const b = reader.uint8();
+                addedFood.add(ejectId);
+                placeEject(ejectId, posX, posY, this.rgbHex(r, g, b), true);
+            }
+        }
+        if (worldHas(16384)) {
+            const ejectCount = reader.uint16();
+            for (let e = 0; e < ejectCount; e++) {
+                if (reader.offset + 6 > reader.byteLength) break;
+                const ejectId = reader.uint32();
+                const eject = this.nodes[ejectId];
+                const dx = reader.int8();
+                const dy = reader.int8();
+                if (!eject || !eject.isEjected) continue;
+                placeEject(ejectId, eject.nx + dx, eject.ny + dy, null, false);
+            }
+        }
+        if (worldHas(32768)) {
+            const ejectCount = reader.uint16();
+            for (let e = 0; e < ejectCount; e++) {
+                if (reader.offset + 8 > reader.byteLength) break;
+                const ejectId = reader.uint32();
+                const posX = reader.int16();
+                const posY = reader.int16();
+                placeEject(ejectId, posX, posY, null, false);
+            }
+        }
+        if (worldHas(65536)) {
+            const foodGone = reader.uint16();
+            for (let i = 0; i < foodGone; i++) {
+                if (reader.offset + 2 > reader.byteLength) break;
+                const foodId = reader.uint16();
+                if (addedFood.has(foodId)) continue;
+                const food = this.nodes[foodId];
+                if (food) food.destroy();
+            }
+        }
+        if (worldHas(131072)) {
+            const virusGone = reader.uint16();
+            for (let i = 0; i < virusGone; i++) {
+                if (reader.offset + 2 > reader.byteLength) break;
+                const virusId = VIRUS_NODE_BASE + reader.uint16();
+                if (addedFood.has(virusId)) continue;
+                const virus = this.nodes[virusId];
+                if (virus) virus.destroy();
+            }
+        }
+        if (worldHas(262144)) {
+            const goneCount = reader.uint16();
+            for (let i = 0; i < goneCount; i++) {
+                if (reader.offset + 4 > reader.byteLength) break;
+                const removeId = reader.uint32();
+                if (addedFood.has(removeId)) continue;
+                const node = this.nodes[removeId];
+                if (node) node.destroy();
+            }
+        }
+        if (this.ua && this.playerCells.length === 0) {
+            this.showOverlays(false);
+            if (window.AgarAds && typeof window.AgarAds.onPlayerDeath === "function") {
+                window.AgarAds.onPlayerDeath();
             }
         }
     }
-    
-    while (reader.canRead) {
-        const node = this.nodes[reader.uint32()];
-        if (node) node.destroy();
-    }
-    
-    this.nodelist.sort((a, b) => {
-        return a.size === b.size ? a.id - b.id : a.size - b.size;
-    });
-    
-    if (this.ua && this.playerCells.length === 0) {
-        this.showOverlays(false);
-        if (window.AgarAds && typeof window.AgarAds.onPlayerDeath === "function") {
-            window.AgarAds.onPlayerDeath();
-        }
-    }
-}
     onUpdateXp(xp) {
         this.accountXp = xp | 0;
         if (window.AgarCabinet && typeof window.AgarCabinet.setXp === "function") {
@@ -2327,6 +2802,12 @@ class Cell {
         this.isVirus = false;
         this.isEjected = false;
         this.isAgitated = false;
+        this.isFood = false;
+        this.isOwn = false;
+        this.playerId = 0;
+        this.teamSide = 0;
+        this.currentSticker = null;
+        this.stickerActive = false;
         this.flag = 0;
         this.points = [];
         this.pointsAcc = [];
@@ -2370,6 +2851,7 @@ class Cell {
     }
     getNumPoints() {
         if (this.id === 0) return 16;
+        if (this.isFood || this.isEjected) return 0;
         let minPoints = this.size < 20 ? 0 : 10;
         if (this.isVirus) minPoints = 30;
         let b = this.isVirus ? this.size : this.size * game.viewZoom;
