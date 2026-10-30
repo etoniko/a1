@@ -1379,7 +1379,7 @@ setSpect() {
         this.sendAccountToken();
         this.joinCurrentServer();
         console.info("Connection successful!");
-        setTimeout(() => { this.sendChat("вошёл в игру!"); }, 1000);
+        setTimeout(() => { this.sendChat("вoшёл в игру!"); }, 1000);
     }
     sendAccountToken() {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -1672,15 +1672,13 @@ setSpect() {
         ctx.save();
         ctx.translate(x, y);
         if (code === "agar") {
-            ctx.fillStyle = "#39d353";
-            ctx.beginPath();
-            ctx.arc(8, 6, 6, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 8px Ubuntu,sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText("A", 8, 6.5);
+            if (!this.agarFavicon) {
+                this.agarFavicon = new Image();
+                this.agarFavicon.src = "https://агарио.рф/favicon.png";
+            }
+            if (this.agarFavicon.complete && this.agarFavicon.naturalWidth) {
+                ctx.drawImage(this.agarFavicon, 0, 0, 14, 14);
+            }
             ctx.restore();
             return 18;
         }
