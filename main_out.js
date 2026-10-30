@@ -1695,7 +1695,7 @@ setSpect() {
                 e = 0;
             for (var i = 0; i < this.nodelist.length; i++) {
                 var node = this.nodelist[i];
-                if (node.shouldRender() && !node.prepareData && 20 < node.size * this.viewZoom) {
+                if (!node.isFood && node.shouldRender() && !node.prepareData && 20 < node.size * this.viewZoom) {
                     e = Math.max(node.size, e);
                     a = Math.min(node.x, a);
                     b = Math.min(node.y, b);
@@ -1713,7 +1713,7 @@ setSpect() {
             });
             for (i = 0; i < this.nodelist.length; i++) {
                 node = this.nodelist[i];
-                if (node.shouldRender() && !(20 >= node.size * this.viewZoom)) {
+                if (!node.isFood && node.shouldRender() && !(20 >= node.size * this.viewZoom)) {
                     for (a = 0; a < node.points.length; ++a) {
                         b = node.points[a].x;
                         c = node.points[a].y;
@@ -1757,7 +1757,12 @@ setSpect() {
         this.ctx.scale(this.viewZoom, this.viewZoom);
         this.ctx.translate(-this.nodeX, -this.nodeY);
         for (let d = 0; d < this.Cells.length; d++) this.Cells[d].drawOneCell(this.ctx);
-        for (let d = 0; d < this.nodelist.length; d++) this.nodelist[d].drawOneCell(this.ctx);
+        this.drawBatchedFood();
+        for (let d = 0; d < this.nodelist.length; d++) {
+            const node = this.nodelist[d];
+            if (node && node.isFood) continue;
+            node.drawOneCell(this.ctx);
+        }
         this.ctx.restore();
         this.drawSplitIcon(this.ctx);
         this.drawTouch(this.ctx);
@@ -1787,7 +1792,46 @@ setSpect() {
         .4 > this.z && (this.z = .4);
         1 < this.z && (this.z = 1);
     }
- drawGrid() {
+    drawBatchedFood() {
+        const list = this.nodelist;
+        const ctx = this.ctx;
+        if (!list || !list.length) return;
+        if (!this._foodBuckets) this._foodBuckets = new Map();
+        const buckets = this._foodBuckets;
+        buckets.forEach((coords) => { coords.length = 0; });
+        let drawn = 0;
+        for (let i = 0; i < list.length; i++) {
+            const node = list[i];
+            if (!node || !node.isFood || node.destroyed) continue;
+            node.updatePos();
+            if (!node.shouldRender()) continue;
+            node.drawTime = this.timestamp;
+            const rad = node.size || 20;
+            const color = node.color || "#FFFFFF";
+            let bucket = buckets.get(color);
+            if (!bucket) {
+                bucket = [];
+                buckets.set(color, bucket);
+            }
+            bucket.push(node.x, node.y, rad);
+            drawn++;
+        }
+        if (!drawn) return;
+        buckets.forEach((coords, color) => {
+            if (!coords.length) return;
+            ctx.beginPath();
+            for (let i = 0; i < coords.length; i += 3) {
+                const x = coords[i];
+                const y = coords[i + 1];
+                const r = coords[i + 2];
+                ctx.moveTo(x + r, y);
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+            }
+            ctx.fillStyle = color;
+            ctx.fill();
+        });
+    }
+    drawGrid() {
     // 1. Заливаем фон полностью (это не зависит от zoom/translate)
     this.ctx.fillStyle = this.showDarkTheme ? "#111111" : "#F2FBFF";
     this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
@@ -2470,7 +2514,7 @@ setSpect() {
                 node.isVirus = !!(spiked & 1);
                 node.isEjected = !!(spiked & 32) || !!(spiked & 64);
                 node.isAgitated = !!(spiked & 16);
-                node.isFood = type === 1 || type === 4;
+                node.isFood = type === 1 || type === 4 || type === 16;
                 node.nx = posX;
                 node.ny = posY;
                 node.setSize(size);
@@ -3138,7 +3182,7 @@ class Cell {
         return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
     }
     drawOneCell(ctx) {
-        if (!this.shouldRender()) return;
+        if (!this.shouldRender() || this.isFood) return;
 
         const simpleRender = this.id !== 0 && !this.isAgitated && smoothRender > game.viewZoom || this.getNumPoints() < 10;
 
