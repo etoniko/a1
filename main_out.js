@@ -1660,6 +1660,7 @@ setSpect() {
     appendAgarTag(str) {
         let s = String(str || "").trim();
         if (!s) return s;
+        if (/в[oо]шёл в игру/i.test(s)) return s.replace(/\s*:(ru|en|uk|tr|zh|ar|es|pl|de|agar)\s*$/i, "").trimEnd();
         s = s.replace(/\s*:(ru|en|uk|tr|zh|ar|es|pl|de|agar)\s*$/i, "").trimEnd();
         const tag = " :agar";
         if (s.length + tag.length >= 200) s = s.slice(0, Math.max(0, 199 - tag.length)).trimEnd();
@@ -1852,7 +1853,10 @@ setSpect() {
         this.buildQTree();
         this.mouseCoordinateChange();
         this.drawGrid();
-        this.nodelist.sort((a, b) => a.size - b.size || a.id - b.id);
+        if (this.nodesSortDirty !== false) {
+            this.nodelist.sort((a, b) => a.size - b.size || a.id - b.id);
+            this.nodesSortDirty = false;
+        }
         this.ctx.save();
         this.ctx.translate(this.canvasWidth / 2, this.canvasHeight / 2);
         this.ctx.scale(this.viewZoom, this.viewZoom);
@@ -1897,40 +1901,64 @@ setSpect() {
         const list = this.nodelist;
         const ctx = this.ctx;
         if (!list || !list.length) return;
-        if (!this._foodBuckets) this._foodBuckets = new Map();
-        const buckets = this._foodBuckets;
-        buckets.forEach((coords) => { coords.length = 0; });
+        const zoom = this.viewZoom || 1;
+        const halfW = this.canvasWidth / (2 * zoom);
+        const halfH = this.canvasHeight / (2 * zoom);
+        const left = this.nodeX - halfW;
+        const right = this.nodeX + halfW;
+        const top = this.nodeY - halfH;
+        const bottom = this.nodeY + halfH;
+        if (!this._foodArcs) this._foodArcs = new Map();
+        if (!this._foodRects) this._foodRects = new Map();
+        const arcs = this._foodArcs;
+        const rects = this._foodRects;
+        arcs.forEach((coords) => { coords.length = 0; });
+        rects.forEach((coords) => { coords.length = 0; });
         let drawn = 0;
         for (let i = 0; i < list.length; i++) {
             const node = list[i];
             if (!node || !node.isFood || node.destroyed) continue;
-            node.updatePos();
-            if (!node.shouldRender()) continue;
+            if (node.nx !== node.x || node.ny !== node.y || node.nSize !== node.size) node.updatePos();
+            const rad = node.size || node.nSize || 0;
+            if (!(rad > 0)) continue;
+            if (rad * zoom < 1.25) continue;
+            const x = node.x;
+            const y = node.y;
+            if (x + rad < left || y + rad < top || x - rad > right || y - rad > bottom) continue;
             node.drawTime = this.timestamp;
-            const rad = node.size || 20;
             const color = node.color || "#FFFFFF";
-            let bucket = buckets.get(color);
+            const boxes = rad * zoom < 4 ? rects : arcs;
+            let bucket = boxes.get(color);
             if (!bucket) {
                 bucket = [];
-                buckets.set(color, bucket);
+                boxes.set(color, bucket);
             }
-            bucket.push(node.x, node.y, rad);
+            bucket.push(x, y, rad);
             drawn++;
         }
         if (!drawn) return;
-        buckets.forEach((coords, color) => {
+        const paint = (coords, color, round) => {
             if (!coords.length) return;
             ctx.beginPath();
-            for (let i = 0; i < coords.length; i += 3) {
-                const x = coords[i];
-                const y = coords[i + 1];
-                const r = coords[i + 2];
-                ctx.moveTo(x + r, y);
-                ctx.arc(x, y, r, 0, Math.PI * 2);
+            if (round) {
+                for (let i = 0; i < coords.length; i += 3) {
+                    const x = coords[i];
+                    const y = coords[i + 1];
+                    const r = coords[i + 2];
+                    ctx.moveTo(x + r, y);
+                    ctx.arc(x, y, r, 0, Math.PI * 2);
+                }
+            } else {
+                for (let i = 0; i < coords.length; i += 3) {
+                    const r = coords[i + 2];
+                    ctx.rect(coords[i] - r, coords[i + 1] - r, r * 2, r * 2);
+                }
             }
             ctx.fillStyle = color;
             ctx.fill();
-        });
+        };
+        rects.forEach((coords, color) => paint(coords, color, false));
+        arcs.forEach((coords, color) => paint(coords, color, true));
     }
     drawGrid() {
     // 1. Заливаем фон полностью (это не зависит от zoom/translate)
@@ -2427,6 +2455,7 @@ setSpect() {
         const EJECT_SIZE = 35;
         this.timestamp = Date.now();
         this.ua = false;
+        this.nodesSortDirty = true;
         for (let killedId; (killedId = reader.uint32());) {
             const killer = this.nodes[reader.uint32()];
             const killedNode = this.nodes[killedId];
