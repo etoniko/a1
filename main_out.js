@@ -285,6 +285,7 @@ function initHelloDialogScale() {
 const SERVERS = {
     ffa: "ffa.agar.su",
     ffa1: "ffa.agar.su:6001",
+    exp: "ffa.agar.su:6001",
     ms: "ms.agar.su:6001",
     pvp1: "ms.agar.su:6004",
     tournament: "ms.agar.su:6002"
@@ -296,9 +297,8 @@ function resolveServerUrl(arg) {
 }
 
 function resolveServerKey(urlOrKey) {
-    if (urlOrKey === "experimental") return "ffa2";
     if (SERVERS[urlOrKey]) return urlOrKey;
-    const hit = Object.keys(SERVERS).find(k => k !== "experimental" && SERVERS[k] === urlOrKey);
+    const hit = Object.keys(SERVERS).find(k => SERVERS[k] === urlOrKey);
     return hit || "ffa";
 }
 
@@ -783,7 +783,7 @@ setSpect() {
         const url = resolveServerUrl(arg);
         if (url === this.CONNECTION_URL) return;
         this.CONNECTION_URL = url;
-        this.updateServerHash(url);
+        this.updateServerHash(SERVERS[arg] ? arg : url);
         syncGamemodeUI(arg);
         if (this.ma && (this.connectShown || this.wsIsOpen())) {
             this.userNickName = null;
