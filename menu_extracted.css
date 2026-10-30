@@ -1205,7 +1205,7 @@ input[type="radio"] .styled:checked+label::after {
     background: #E2E2E2 url('./img/gamemode_Icon_BattleRoyale.png') top 0px center no-repeat;
     background-size: 70px auto;
 }
-.experimental {
+.exp {
     background: #E2E2E2 url('./img/gamemode_Icon_Experimental.png') top 20px center no-repeat;
     background-size: 50px auto;
 }
@@ -1225,7 +1225,7 @@ input[type="radio"] .styled:checked+label::after {
     background-color: #ffaa00;
     color: #fff;
 }
-.item:hover.experimental, .item.active.experimental {
+.item:hover.exp, .item.active.exp {
     background-color: #1e67e0;
     color: #fff;
 }
@@ -1249,7 +1249,7 @@ input[type="radio"] .styled:checked+label::after {
 .item > .ribbon > div {
     position: relative;
 }
-.experimental > .label {
+.exp > .label {
     font-size: 7pt;
 }
 
