@@ -388,9 +388,19 @@ class Game {
         this._miniMapLastCell = "";
         this._miniMapLastSpan = null;
         this.userNickName = null;
-		this.skinMap = {};     // nick -> codeid
+        this.skinMap = {};     // nick -> codeid
         this.skinCache = {};   // codeid -> Image
         this.skinLoading = {}; // чтобы не грузить 100 раз
+        this.showStickers = true;
+        this.stickerMap = {};
+        this.stickerCache = {};
+        this.stickerLoading = {};
+        this.localStickerHeld = false;
+        this.localStickerId = null;
+        this._heldStickers = new Set();
+        this._currentSticker = null;
+        this._stickerGateUntil = 0;
+        this._stickerSyncTimer = null;
         this.hideChat = false;
         this.showDarkTheme = false;
         this.showName = true;
@@ -550,6 +560,169 @@ getSkinForNick(nick) {
 
     return null;
 }
+    async loadStickerList() {
+        try {
+            const res = await fetch("https://api.agar.su/stickerlist.txt");
+            const text = await res.text();
+            text.split("\n").forEach((line) => {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith("#")) return;
+                const idx = trimmed.indexOf(":");
+                if (idx < 0) return;
+                const nick = this.normalizeNick(trimmed.slice(0, idx).trim());
+                const code = trimmed.slice(idx + 1).trim();
+                if (!nick || !code) return;
+                this.stickerMap[nick] = code;
+            });
+        } catch (e) {
+            console.error("Sticker list load error", e);
+        }
+    }
+    getStickerImage(nick, stickerId) {
+        const id = Number(stickerId);
+        if (!Number.isFinite(id) || id < 1 || id > 9) return null;
+        const key = this.normalizeNick(String(nick || "").replace(/<[^>]*>/g, ""));
+        const code = key && this.stickerMap[key];
+        const url = code
+            ? "https://api.agar.su/stickers/" + encodeURIComponent(code) + "/" + id + ".png"
+            : "https://api.agar.su/stickers/" + id + ".png";
+        if (this.stickerCache[url]) return this.stickerCache[url];
+        if (this.stickerLoading[url]) return null;
+        const img = new Image();
+        img.src = url;
+        this.stickerLoading[url] = true;
+        img.onload = () => {
+            if (img.width > 0) this.stickerCache[url] = img;
+            delete this.stickerLoading[url];
+        };
+        img.onerror = () => {
+            delete this.stickerLoading[url];
+        };
+        return null;
+    }
+    setNodeSticker(node, stickerId) {
+        if (!node) return;
+        if (stickerId) {
+            node.currentSticker = stickerId;
+            node.stickerActive = true;
+        } else {
+            node.currentSticker = null;
+            node.stickerActive = false;
+        }
+    }
+    sendSticker(stickerId, action) {
+        if (!this.wsIsOpen()) return;
+        const msg = this.prepareData(6);
+        msg.setUint8(0, 200);
+        msg.setUint8(1, stickerId);
+        msg.setUint8(2, action ? 1 : 0);
+        this.wsSend(msg);
+    }
+    showStickerOverCells(stickerId) {
+        this.localStickerHeld = true;
+        this.localStickerId = stickerId;
+        for (let i = 0; i < this.playerCells.length; i++) {
+            this.setNodeSticker(this.playerCells[i], stickerId);
+        }
+    }
+    hideOwnSticker() {
+        this.localStickerHeld = false;
+        this.localStickerId = null;
+        for (let i = 0; i < this.playerCells.length; i++) {
+            this.setNodeSticker(this.playerCells[i], null);
+        }
+    }
+    applyHeldStickerState() {
+        let next = null;
+        this._heldStickers.forEach((id) => { next = id; });
+        if (next == null) {
+            if (this._currentSticker != null) {
+                this.sendSticker(this._currentSticker, false);
+                this._currentSticker = null;
+            }
+            this.hideOwnSticker();
+            return;
+        }
+        if (this._currentSticker === next) {
+            this.showStickerOverCells(next);
+            return;
+        }
+        if (this._currentSticker != null) this.sendSticker(this._currentSticker, false);
+        this._currentSticker = next;
+        this.sendSticker(next, true);
+        this.showStickerOverCells(next);
+    }
+    requestStickerSync() {
+        const wait = this._stickerGateUntil - Date.now();
+        if (wait <= 0) {
+            if (this._stickerSyncTimer) {
+                clearTimeout(this._stickerSyncTimer);
+                this._stickerSyncTimer = null;
+            }
+            this.applyHeldStickerState();
+            this._stickerGateUntil = Date.now() + 300;
+            return;
+        }
+        if (this._stickerSyncTimer) return;
+        this._stickerSyncTimer = setTimeout(() => {
+            this._stickerSyncTimer = null;
+            this.applyHeldStickerState();
+            this._stickerGateUntil = Date.now() + 300;
+            let held = null;
+            this._heldStickers.forEach((id) => { held = id; });
+            if (held !== this._currentSticker || (held == null && this._currentSticker != null)) {
+                this.requestStickerSync();
+            }
+        }, wait);
+    }
+    pressStickerKey(stickerId) {
+        if (!this.showStickers || this.isTyping) return;
+        if (stickerId < 1 || stickerId > 9) return;
+        if (this._heldStickers.has(stickerId)) return;
+        this._heldStickers.add(stickerId);
+        this.requestStickerSync();
+    }
+    releaseStickerKey(stickerId) {
+        if (!this._heldStickers.has(stickerId)) return;
+        this._heldStickers.delete(stickerId);
+        this.requestStickerSync();
+    }
+    clearHeldStickers() {
+        if (this._stickerSyncTimer) {
+            clearTimeout(this._stickerSyncTimer);
+            this._stickerSyncTimer = null;
+        }
+        this._stickerGateUntil = 0;
+        if (!this._heldStickers.size && this._currentSticker == null) return;
+        this._heldStickers.clear();
+        if (this._currentSticker != null) {
+            this.sendSticker(this._currentSticker, false);
+            this._currentSticker = null;
+        }
+        this.hideOwnSticker();
+    }
+    applyStickerPacket(stickerPlayerId, stickerId, enabled) {
+        const id = stickerId | 0;
+        if (id < 1 || id > 9) return;
+        let isOwn = stickerPlayerId === this.ownerPlayerId;
+        for (let i = 0; i < this.nodelist.length; i++) {
+            const node = this.nodelist[i];
+            if (node && (node.id === stickerPlayerId || node.playerId === stickerPlayerId)) {
+                if (node.isOwn) isOwn = true;
+            }
+        }
+        if (isOwn) {
+            if (enabled && this.localStickerHeld) this.showStickerOverCells(this.localStickerId || id);
+            if (!enabled) this.hideOwnSticker();
+            return;
+        }
+        for (let i = 0; i < this.nodelist.length; i++) {
+            const node = this.nodelist[i];
+            if (!node || node.isOwn || node.isFood || node.isVirus || node.isEjected) continue;
+            if (node.id !== stickerPlayerId && node.playerId !== stickerPlayerId) continue;
+            this.setNodeSticker(node, enabled ? id : null);
+        }
+    }
 
     getXp(level) {
         return ~~(100 * (level ** 2 / 2));
@@ -637,6 +810,7 @@ setSpect() {
         this.mainCanvas = this.nCanvas = document.getElementById("canvas");
         this.ctx = this.mainCanvas.getContext("2d");
 		this.loadSkinList();
+        this.loadStickerList();
         this.mainCanvas.onmousemove = (event) => {
             this.rawMouseX = event.clientX * this.dpr;
             this.rawMouseY = event.clientY * this.dpr;
@@ -679,6 +853,10 @@ setSpect() {
         this.spacePressed = false;
         this.wPressed = false;
         onkeydown = (event) => {
+            if (!this.isTyping && event.keyCode >= 49 && event.keyCode <= 57) {
+                this.pressStickerKey(event.keyCode - 48);
+                return;
+            }
             switch (event.keyCode) {
                 case 13:
                     if (this.isTyping || this.hideChat) {
@@ -716,6 +894,9 @@ setSpect() {
             }
         };
         onkeyup = (event) => {
+            if (event.keyCode >= 49 && event.keyCode <= 57) {
+                this.releaseStickerKey(event.keyCode - 48);
+            }
             switch (event.keyCode) {
                 case 32:
                     this.spacePressed = false;
@@ -727,6 +908,7 @@ setSpect() {
         };
         onblur = () => {
             this.wPressed = this.spacePressed = false;
+            this.clearHeldStickers();
         };
         document.addEventListener("visibilitychange", () => {
             if (document.hidden) {
@@ -1350,6 +1532,14 @@ setSpect() {
             case 114:
                 const xp = msg.getUint32(offset, true);
                 this.onUpdateXp(xp);
+                break;
+            case 200:
+                if (!this.showStickers || msg.byteLength < offset + 6) break;
+                const stickerPlayerId = msg.getUint32(offset, true);
+                offset += 4;
+                const stickerId = msg.getUint8(offset++);
+                const stickerAction = msg.getUint8(offset++);
+                this.applyStickerPacket(stickerPlayerId, stickerId, stickerAction === 1);
                 break;
         }
     }
@@ -2021,14 +2211,14 @@ setSpect() {
         return null;
     }
     applyNodeSticker(node, stickerFromUpdate) {
-        if (!node || stickerFromUpdate == null) return;
-        if (stickerFromUpdate) {
-            node.currentSticker = stickerFromUpdate;
-            node.stickerActive = true;
-        } else {
-            node.currentSticker = null;
-            node.stickerActive = false;
+        if (!node || !this.showStickers) return;
+        if (node.isOwn || this.playerCells.indexOf(node) !== -1) {
+            if (this.localStickerHeld && this.localStickerId) this.setNodeSticker(node, this.localStickerId);
+            else this.setNodeSticker(node, null);
+            return;
         }
+        if (stickerFromUpdate) this.setNodeSticker(node, stickerFromUpdate);
+        else if (stickerFromUpdate === false) this.setNodeSticker(node, null);
     }
     teamSideFrom(spiked) {
         if (spiked & 2) return 1;
@@ -2059,6 +2249,7 @@ setSpect() {
         node.isOwn = true;
         this.hideOverlays();
         this.playerCells.push(node);
+        if (this.localStickerHeld && this.localStickerId) this.setNodeSticker(node, this.localStickerId);
         if (this.playerCells.length === 1) {
             this.nodeX = node.x;
             this.nodeY = node.y;
@@ -2997,6 +3188,17 @@ class Cell {
                 skinSz * 2
             );
             ctx.restore();
+        }
+
+        if (game.showStickers && this.stickerActive && this.currentSticker && !this.isFood && !this.isVirus && !this.isEjected) {
+            const stickerImg = game.getStickerImage(this.name, this.currentSticker);
+            if (stickerImg && stickerImg.complete && stickerImg.width > 0) {
+                ctx.save();
+                ctx.clip();
+                const sz = this.size || renderSize;
+                ctx.drawImage(stickerImg, 0, 0, stickerImg.width, stickerImg.height, this.x - sz, this.y - sz, sz * 2, sz * 2);
+                ctx.restore();
+            }
         }
 
         const isPlayer = game.playerCells.includes(this);
