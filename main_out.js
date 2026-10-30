@@ -284,7 +284,7 @@ function initHelloDialogScale() {
 
 const SERVERS = {
     ffa: "ffa.agar.su",
-    exp: "ffa.agar.su:6001",
+    ffa1: "ffa.agar.su:6001",
     ms: "ms.agar.su:6001",
     pvp1: "ms.agar.su:6004",
     tournament: "ms.agar.su:6002"
@@ -428,6 +428,7 @@ class Game {
         this.pinchZoomStartDistance = 0;
         this.isPinching = false;
         this.ejectInterval = null;
+        this.ejectKeyInterval = null;
         this.ejectPressedByTouch = false;
         this.isTouchStart = "ontouchstart" in window && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         this.splitPressed = false;
@@ -884,6 +885,11 @@ setSpect() {
                         this.sendMouseMove();
                         this.sendUint8(21);
                         this.wPressed = true;
+                        if (this.ejectKeyInterval) clearInterval(this.ejectKeyInterval);
+                        this.ejectKeyInterval = setInterval(() => {
+                            this.sendMouseMove();
+                            this.sendUint8(21);
+                        }, 100);
                     }
                     break;
                 case 27:
@@ -903,11 +909,13 @@ setSpect() {
                     break;
                 case 87:
                     this.wPressed = false;
+                    this.stopEjectHold();
                     break;
             }
         };
         onblur = () => {
             this.wPressed = this.spacePressed = false;
+            this.stopEjectHold();
             this.clearHeldStickers();
         };
         document.addEventListener("visibilitychange", () => {
@@ -1570,6 +1578,8 @@ setSpect() {
         color = '#' + color;
         var chatName = getString();
         var chatMessage = getString();
+        const chatParsed = this.parseChatMark(chatMessage);
+        chatMessage = chatParsed.text;
         if (window.AgarAntimat && typeof window.AgarAntimat.censor === "function") {
             chatName = window.AgarAntimat.censor(chatName);
             chatMessage = window.AgarAntimat.censor(chatMessage);
@@ -1581,6 +1591,7 @@ setSpect() {
             "name": chatName,
             "color": color,
             "message": chatMessage,
+            "chatMark": chatParsed.tag,
             "time": Date.now()
         });
         this.drawChatBoard();
@@ -1634,7 +1645,99 @@ setSpect() {
             this.wsSend(msg);
         }
     }
+    stopEjectHold() {
+        if (this.ejectKeyInterval) {
+            clearInterval(this.ejectKeyInterval);
+            this.ejectKeyInterval = null;
+        }
+    }
+    parseChatMark(message) {
+        const raw = String(message == null ? "" : message);
+        const m = raw.match(/\s*:(ru|en|uk|tr|zh|ar|es|pl|de|agar)\s*$/i);
+        if (!m) return { text: raw, tag: null };
+        return { text: raw.slice(0, m.index).trimEnd(), tag: m[1].toLowerCase() };
+    }
+    appendAgarTag(str) {
+        let s = String(str || "").trim();
+        if (!s) return s;
+        s = s.replace(/\s*:(ru|en|uk|tr|zh|ar|es|pl|de|agar)\s*$/i, "").trimEnd();
+        const tag = " :agar";
+        if (s.length + tag.length >= 200) s = s.slice(0, Math.max(0, 199 - tag.length)).trimEnd();
+        return s + tag;
+    }
+    drawChatMark(ctx, x, y, tag) {
+        const code = tag === "en" ? "gb" : tag === "uk" ? "ua" : tag === "zh" ? "cn" : tag === "ar" ? "sa" : tag;
+        const w = 16;
+        const h = 11;
+        ctx.save();
+        ctx.translate(x, y);
+        if (code === "agar") {
+            ctx.fillStyle = "#39d353";
+            ctx.beginPath();
+            ctx.arc(8, 6, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 8px Ubuntu,sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("A", 8, 6.5);
+            ctx.restore();
+            return 18;
+        }
+        const stripes = {
+            ru: ["#ffffff", "#0039a6", "#d52b1e"],
+            ua: ["#005bbb", "#ffd500"],
+            de: ["#000000", "#dd0000", "#ffce00"],
+            es: ["#aa151b", "#f1bf00", "#aa151b"],
+            pl: ["#ffffff", "#dc143c"],
+            cn: ["#de2910"],
+            sa: ["#006c35"],
+            tr: ["#e30a17"],
+            gb: ["#012169"]
+        }[code];
+        if (!stripes) {
+            ctx.restore();
+            return 0;
+        }
+        ctx.beginPath();
+        ctx.rect(0, 0, w, h);
+        ctx.clip();
+        stripes.forEach((color, i) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(0, (h / stripes.length) * i, w, h / stripes.length + 0.5);
+        });
+        if (code === "gb") {
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2);
+            ctx.lineTo(w, h / 2);
+            ctx.moveTo(w / 2, 0);
+            ctx.lineTo(w / 2, h);
+            ctx.stroke();
+            ctx.strokeStyle = "#c8102e";
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+        } else if (code === "tr") {
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.arc(6, h / 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#e30a17";
+            ctx.beginPath();
+            ctx.arc(7, h / 2, 2.3, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (code === "cn") {
+            ctx.fillStyle = "#ffde00";
+            ctx.beginPath();
+            ctx.arc(4, 3.5, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+        return 20;
+    }
     sendChat(str) {
+        str = this.appendAgarTag(str);
         if (this.wsIsOpen() && (str.length < 200) && (str.length > 0) && !this.hideChat) {
             var msg = this.prepareData(2 + 2 * str.length);
             var offset = 0;
@@ -1969,14 +2072,15 @@ setSpect() {
             const nameWidth = chatName.getWidth();
             const hasLvl = entry.playerLevel != null && entry.playerLevel >= 0;
             const starPad = hasLvl ? STAR_GAP : 0;
-            const prefixWidth = starPad + nameWidth + measureChatTextWidth(": ", CHAT_FONT_SIZE);
+            const markPad = entry.chatMark ? 20 : 0;
+            const prefixWidth = markPad + starPad + nameWidth + measureChatTextWidth(": ", CHAT_FONT_SIZE);
             const msgLines = wrapChatMessageLines(entry.message, prefixWidth, CHAT_MAX_WIDTH, CHAT_FONT_SIZE);
-            chatEntries.push({ entry, chatName, nameWidth, msgLines, hasLvl, starPad });
+            chatEntries.push({ entry, chatName, nameWidth, msgLines, hasLvl, starPad, markPad });
         }
 
         let yCursor = this.chatCanvas.height / scaleFactor;
         for (let e = chatEntries.length - 1; e >= 0; e--) {
-            const { entry, chatName, nameWidth, msgLines, hasLvl, starPad } = chatEntries[e];
+            const { entry, chatName, nameWidth, msgLines, hasLvl, starPad, markPad } = chatEntries[e];
             const blockHeight = msgLines.length * CHAT_LINE_HEIGHT;
             yCursor -= blockHeight;
 
@@ -1984,6 +2088,7 @@ setSpect() {
                 const lineY = yCursor + li * CHAT_LINE_HEIGHT;
                 if (li === 0) {
                     let x = CHAT_BASE_X;
+                    if (entry.chatMark) x += this.drawChatMark(ctx, x, lineY + 3, entry.chatMark);
                     if (hasLvl) {
                         this.drawLevelStar(ctx, x + 11, lineY + 10, entry.playerLevel, 12);
                         x += starPad;
@@ -1998,7 +2103,7 @@ setSpect() {
                     const chatText = new UText(CHAT_FONT_SIZE, "#666666");
                     chatText.setValue(msgLines[li]);
                     const textImg = chatText.render();
-                    ctx.drawImage(textImg, CHAT_BASE_X + starPad, lineY);
+                    ctx.drawImage(textImg, CHAT_BASE_X + markPad + starPad, lineY);
                 }
             }
             yCursor -= 4;
