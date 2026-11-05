@@ -4999,7 +4999,7 @@ setSpect() {
     }
     initServersFromHash(reconnect) {
         const rawHash = location.hash.slice(1).split("?")[0];
-        const hash = rawHash ? resolveServerKey(rawHash) : "tournament";
+        const hash = rawHash ? resolveServerKey(rawHash) : "ffa";
         let url = SERVERS[hash] || SERVERS[rawHash] || SERVERS.ffa;
         syncGamemodeUI(hash);
         if (!rawHash || rawHash !== hash || !SERVERS[rawHash]) {
@@ -8228,7 +8228,7 @@ if (document.readyState === "loading") {
                     <div class="modes-container">
                         <h4 class="title">Выберите режим игры</h4>
                         <div class="gamemodes">
-                            <div id="mode_ffa" class="item ffa" data-server="ffa" onclick="setServer('ffa')"><span class="label">FFA</span></div>
+                            <div id="mode_ffa" class="item ffa active" data-server="ffa" onclick="setServer('ffa')"><span class="label">FFA</span></div>
 							<div id="mode_exp" class="item exp" data-server="exp" onclick="setServer('exp')"><span class="label">EXP</span></div>
                             <div id="mode_ms" class="item teams" data-server="ms" onclick="setServer('ms')"><span class="label">MegaSplit</span></div>
                             <div id="mode_pvp1" class="item battleroyale" data-server="pvp1" onclick="setServer('pvp1')"><span class="label">PvP</span></div>
@@ -8241,7 +8241,7 @@ if (document.readyState === "loading") {
                         <h4 class="party-title"><span class="party-title">Tournament</span></h4>
                         <div class="party-text">Для сильнейших игроков (актив c 20:00)</div>
                         <div class="clearfix">
-                            <button type="button" class="btn btn-primary btn-party party-join is-in" data-server="tournament" onclick="joinTournament()">Вступить</button>
+                            <button type="button" class="btn btn-primary btn-party party-join" data-server="tournament" onclick="joinTournament()">Вступить</button>
                         </div>
                     </div>
                 </div>
