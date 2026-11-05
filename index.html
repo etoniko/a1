@@ -8602,11 +8602,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </label>
                                     <div class="cab-shop-fields">
                                         <div class="cab-field">
-                                            <label for="cabNickname">Никнейм</label>
+                                            <label for="cabNickname" id="cabNickLabel">Никнейм</label>
                                             <input type="text" id="cabNickname" maxlength="16" placeholder="Ваш ник" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="cab-nick">
                                         </div>
                                         <div class="cab-field">
-                                            <label for="cabPassword">Пароль на ник</label>
+                                            <label for="cabPassword" id="cabPassLabel">Пароль на ник</label>
                                             <input type="password" id="cabPassword" maxlength="5" placeholder="Необязательно" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" name="cab-pass">
                                         </div>
                                         <div class="cab-shop-pills">
@@ -9726,6 +9726,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const type = isClan ? "clan" : "personal";
         const radio = document.querySelector('input[name="cabServiceType"][value="' + type + '"]');
         if (radio) radio.checked = true;
+        syncShopLabels();
         const inv = document.getElementById("cabInvisible");
         const rot = document.getElementById("cabRotation");
         if (inv && opts.invisible) inv.checked = true;
@@ -10061,6 +10062,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const clan = document.querySelector('input[name="cabServiceType"][value="clan"]');
         return clan && clan.checked ? 2 : 1;
     }
+    function isClanOrder() {
+        return shopMultiplier() === 2;
+    }
+    function isValidClanTag(value) {
+        return /^\[[^\[\]]{1,4}\]$/.test(String(value || "").trim());
+    }
+    function syncShopLabels() {
+        const clan = isClanOrder();
+        const nickLabel = document.getElementById("cabNickLabel");
+        const passLabel = document.getElementById("cabPassLabel");
+        const s = shopEls();
+        if (nickLabel) nickLabel.textContent = clan ? "Клан" : "Никнейм";
+        if (passLabel) passLabel.textContent = clan ? "Пароль на клан" : "Пароль на ник";
+        if (s.nick) {
+            s.nick.maxLength = clan ? 6 : 16;
+            s.nick.placeholder = clan ? "[клан]" : "Ваш ник";
+        }
+    }
 
     /**
      * Обрабатывает загруженный файл: если это PNG или GIF — оставляет как есть.
@@ -10136,20 +10155,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const pass = (s.pass.value || "").trim();
         const file = s.file.files && s.file.files[0];
         const mult = shopMultiplier();
-        const passwordCost = pass ? 150 : 0;
+        const passwordCost = pass ? 200 : 0;
         const invisibleCost = s.inv.checked ? 500 : 0;
         const rotationCost = s.rot.checked ? 500 : 0;
         let skinCost = 0;
         if (file) {
-            // PNG и GIF — стандартная цена, JPG/JPEG — обрабатываем как PNG
             const type = file.type;
-            if (type === "image/gif") {
-                skinCost = 4500;
-            } else if (type === "image/png" || type === "image/jpeg" || type === "image/jpg") {
-                skinCost = 150;
+            if (type === "image/gif" || type === "image/png" || type === "image/jpeg" || type === "image/jpg") {
+                skinCost = 200;
             }
         }
         const total = (passwordCost + skinCost + invisibleCost + rotationCost) * mult;
+        const clanOk = !isClanOrder() || isValidClanTag(nick);
+        if (isClanOrder() && nick && !clanOk) {
+            shopMsg("Клан пишется в скобках, внутри до 4 символов: [TAG]");
+        } else if (s.msg && s.msg.textContent.indexOf("скобках") !== -1) {
+            shopMsg("");
+        }
         s.mult.textContent = mult === 2 ? "2×" : "1×";
         s.passCost.textContent = (passwordCost * mult) + " ₽";
         s.skinCost.textContent = (skinCost * mult) + " ₽";
@@ -10158,7 +10180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         s.total.textContent = total + " ₽";
         const hasItem = !!(pass || file || s.inv.checked || s.rot.checked);
         const logged = !!getAccountToken();
-        s.buy.disabled = !(logged && nick && hasItem && total > 0);
+        s.buy.disabled = !(logged && nick && hasItem && total > 0 && clanOk);
     }
 
     function previewShopFile(file) {
@@ -10210,7 +10232,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const serviceType = (document.querySelector('input[name="cabServiceType"]:checked') || {}).value || "personal";
         
         if (!nickname) {
-            shopMsg("Введите ник.");
+            shopMsg(serviceType === "clan" ? "Введите клан." : "Введите ник.");
+            return;
+        }
+        if (serviceType === "clan" && !isValidClanTag(nickname)) {
+            shopMsg("Клан пишется в скобках, внутри до 4 символов: [TAG]");
             return;
         }
         if (!password && !file && !s.inv.checked && !s.rot.checked) {
@@ -10263,12 +10289,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (token) headers.Authorization = "Game " + token;
 
         // Итог для чека (в рублях) — считаем так же, как в calculateShop.
-        const passwordCostRub = password ? 150 : 0;
+        const passwordCostRub = password ? 200 : 0;
         const invisibleCostRub = s.inv.checked ? 500 : 0;
         const rotationCostRub = s.rot.checked ? 500 : 0;
         let skinCostRub = 0;
         if (processedFile) {
-            skinCostRub = processedFile.type === "image/gif" ? 4500 : 150;
+            skinCostRub = 200;
         }
         const totalRub = (passwordCostRub + skinCostRub + invisibleCostRub + rotationCostRub) * mult;
 
@@ -10322,18 +10348,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function bindShop() {
         const s = shopEls();
         if (!s.form) return;
+        syncShopLabels();
         ["input", "change"].forEach((ev) => {
             s.form.addEventListener(ev, calculateShop);
         });
         $all('input[name="cabServiceType"]').forEach((r) => {
             r.addEventListener("change", () => {
-                if (r.value === "clan") {
-                    s.nick.maxLength = 6;
-                    s.nick.placeholder = "[клан]";
-                } else {
-                    s.nick.maxLength = 16;
-                    s.nick.placeholder = "Ваш ник";
-                }
+                syncShopLabels();
                 calculateShop();
             });
         });
