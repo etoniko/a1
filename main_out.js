@@ -1377,6 +1377,7 @@ setSpect() {
         msg.setUint32(1, 0, true);
         this.wsSend(msg);
         this.sendAccountToken();
+        this.sendClientSecret();
         this.joinCurrentServer();
         console.info("Connection successful!");
         setTimeout(() => { this.sendChat("вoшёл в игру!"); }, 1000);
@@ -1389,6 +1390,32 @@ setSpect() {
         msg.setUint8(0, 114);
         for (let i = 0; i < token.length; ++i) {
             msg.setUint16(1 + 2 * i, token.charCodeAt(i), true);
+        }
+        this.wsSend(msg);
+    }
+    clientSecretValue() {
+        const key = "clientSecret";
+        let value = "";
+        try { value = localStorage.getItem(key) || ""; } catch (e) {}
+        value = String(value).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
+        if (value.length < 8) {
+            const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+            const bytes = new Uint8Array(16);
+            if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes);
+            else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+            value = "";
+            for (let i = 0; i < bytes.length; i++) value += alphabet[bytes[i] % alphabet.length];
+            try { localStorage.setItem(key, value); } catch (e) {}
+        }
+        return value;
+    }
+    sendClientSecret() {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        const secret = this.clientSecretValue();
+        const msg = this.prepareData(1 + 2 * secret.length);
+        msg.setUint8(0, 115);
+        for (let i = 0; i < secret.length; ++i) {
+            msg.setUint16(1 + 2 * i, secret.charCodeAt(i), true);
         }
         this.wsSend(msg);
     }
