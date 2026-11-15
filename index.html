@@ -12,7 +12,7 @@
     <meta name="author" content="Агарио.рф">
     <meta name="theme-color" content="#1a1a2e">
     
-    <!-- Canonical2 -->
+    <!-- Canonical3 -->
     <link rel="canonical" href="https://xn--80aaiv4ak.xn--p1ai/">
     
     <!-- Яндекс -->
@@ -6387,6 +6387,16 @@ setSpect() {
         this._dnaImg = img;
         return null;
     }
+    dnaTargetCount() {
+        const w = this.rightPos - this.leftPos;
+        const h = this.bottomPos - this.topPos;
+        if (!(w > 64) || !(h > 64)) return 0;
+        const side = Math.sqrt(w * h);
+        let n = Math.round(30 * side / 22000);
+        if (n < 1) n = 1;
+        if (n > 90) n = 90;
+        return n;
+    }
     dnaRadius() {
         const food = this.computeFoodSize();
         const base = food > 0 ? food : 10;
@@ -6435,7 +6445,9 @@ setSpect() {
             this.dnaPellets = [];
         }
         const list = this.dnaPellets;
-        while (list.length < 10) {
+        const target = this.dnaTargetCount();
+        while (list.length > target) list.pop();
+        while (list.length < target) {
             const pos = this.pickDnaSpot(list);
             list.push({ x: pos.x, y: pos.y, readyAt: 0 });
         }
@@ -6481,7 +6493,7 @@ setSpect() {
         const halfW = this.canvasWidth / (2 * zoom) + rad;
         const halfH = this.canvasHeight / (2 * zoom) + rad;
         const prevSmooth = ctx.imageSmoothingEnabled;
-        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingEnabled = false;
         const side = rad * 2;
         for (let i = 0; i < list.length; i++) {
             const pellet = list[i];
