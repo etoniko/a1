@@ -4,7 +4,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <!-- Основной SEO -->
+    <!-- Основной SEO2 -->
     <title>Агарио</title>
     <meta name="description" content="Агарио.рф — лучшая версия Агарио онлайн. Играй в шарики прямо в браузере без скачивания. Быстрые сервера, красивые скины, вирусы и много игроков. Начни прямо сейчас!">
     <meta name="keywords" content="агарио, агарио.рф, agario, agar.io, шарики онлайн, игра агарио, агарио играть, агарио без скачивания, cell, cells, virus, blob, io игры">
@@ -12,7 +12,7 @@
     <meta name="author" content="Агарио.рф">
     <meta name="theme-color" content="#1a1a2e">
     
-    <!-- Canonical -->
+    <!-- Canonical2 -->
     <link rel="canonical" href="https://xn--80aaiv4ak.xn--p1ai/">
     
     <!-- Яндекс -->
@@ -4603,6 +4603,11 @@ class Game {
         this.foodMass = 1;
         this.foodMaxMass = 4;
         this.mapBoundsReady = false;
+        this.dnaEaten = this.readDnaEaten();
+        this.dnaPellets = [];
+        this._dnaMapSig = "";
+        this._dnaLabel = null;
+        this._dnaImg = null;
         this.ownerPlayerId = -1;
         this.ua = false;
         // Игрок и клетки
@@ -4671,8 +4676,8 @@ class Game {
         this.ejectPressed = false;
         this.splitIcon = new Image();
         this.ejectIcon = new Image();
-        this.splitIcon.src = "https://agar.su/photo/split.png";
-        this.ejectIcon.src = "https://agar.su/photo/eject.png";
+        this.splitIcon.src = "https://api.agar.su/photo/split.png";
+        this.ejectIcon.src = "https://api.agar.su/photo/eject.png";
         this.timestamp = 0;
         // Управление
         this.isTyping = false;
@@ -6106,6 +6111,7 @@ setSpect() {
         this.ctx.translate(-this.nodeX, -this.nodeY);
         for (let d = 0; d < this.Cells.length; d++) this.Cells[d].drawOneCell(this.ctx);
         this.drawBatchedFood();
+        this.tickLocalDna(this.ctx);
         for (let d = 0; d < this.nodelist.length; d++) {
             const node = this.nodelist[d];
             if (node && node.isFood) continue;
@@ -6360,6 +6366,129 @@ setSpect() {
             ctx.restore();
         }
         if (arcFood.length) this.drawFoodArcs(arcFood);
+    }
+    readDnaEaten() {
+        try {
+            const n = parseInt(localStorage.getItem("dnaEaten"), 10);
+            return n > 0 ? n : 0;
+        } catch (e) {
+            return 0;
+        }
+    }
+    syncDnaWallet() {
+        if (!this._dnaLabel) this._dnaLabel = document.getElementById("dnaEatenCount");
+        if (this._dnaLabel) this._dnaLabel.textContent = String(this.dnaEaten | 0);
+    }
+    ensureDnaSprite() {
+        if (this._dnaImg) return this._dnaImg.complete && this._dnaImg.naturalWidth ? this._dnaImg : null;
+        const img = new Image();
+        img.decoding = "async";
+        img.src = "./img/spin.png";
+        this._dnaImg = img;
+        return null;
+    }
+    dnaRadius() {
+        const food = this.computeFoodSize();
+        const base = food > 0 ? food : 10;
+        return Math.max(16, base * 1.8);
+    }
+    pickDnaSpot(pellets) {
+        const cells = this.playerCells;
+        const minSep2 = 280 * 280;
+        for (let attempt = 0; attempt < 16; attempt++) {
+            const pos = this.computeFoodPosition((Math.random() * 65536) | 0);
+            let ok = true;
+            for (let i = 0; i < pellets.length; i++) {
+                const dx = pellets[i].x - pos.x;
+                const dy = pellets[i].y - pos.y;
+                if (dx * dx + dy * dy < minSep2) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (!ok) continue;
+            for (let i = 0; i < cells.length; i++) {
+                const cell = cells[i];
+                const dx = cell.x - pos.x;
+                const dy = cell.y - pos.y;
+                const reach = (cell.size || 40) + 240;
+                if (dx * dx + dy * dy < reach * reach) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) return pos;
+        }
+        return this.computeFoodPosition((Math.random() * 65536) | 0);
+    }
+    fillDnaPellets() {
+        const w = this.rightPos - this.leftPos;
+        const h = this.bottomPos - this.topPos;
+        if (!this.mapBoundsReady || !(w > 64) || !(h > 64)) {
+            this.dnaPellets = [];
+            this._dnaMapSig = "";
+            return;
+        }
+        const sig = w + ":" + h + ":" + this.leftPos + ":" + this.topPos;
+        if (this._dnaMapSig !== sig) {
+            this._dnaMapSig = sig;
+            this.dnaPellets = [];
+        }
+        const list = this.dnaPellets;
+        while (list.length < 10) {
+            const pos = this.pickDnaSpot(list);
+            list.push({ x: pos.x, y: pos.y, readyAt: 0 });
+        }
+    }
+    eatDnaPellet(index) {
+        this.dnaEaten = (this.dnaEaten | 0) + 1;
+        try { localStorage.setItem("dnaEaten", String(this.dnaEaten)); } catch (e) {}
+        this.syncDnaWallet();
+        const pellet = this.dnaPellets[index];
+        const pos = this.pickDnaSpot(this.dnaPellets);
+        pellet.x = pos.x;
+        pellet.y = pos.y;
+        pellet.readyAt = Date.now() + 700;
+    }
+    tickLocalDna(ctx) {
+        if (!this.mapBoundsReady) return;
+        this.fillDnaPellets();
+        const list = this.dnaPellets;
+        if (!list.length) return;
+        const rad = this.dnaRadius();
+        const cells = this.playerCells;
+        if (cells.length) {
+            const now = Date.now();
+            const pad = rad * 0.35;
+            for (let i = 0; i < list.length; i++) {
+                const pellet = list[i];
+                if (pellet.readyAt > now) continue;
+                for (let c = 0; c < cells.length; c++) {
+                    const cell = cells[c];
+                    const dx = cell.x - pellet.x;
+                    const dy = cell.y - pellet.y;
+                    const lim = (cell.size || 0) + pad;
+                    if (dx * dx + dy * dy <= lim * lim) {
+                        this.eatDnaPellet(i);
+                        break;
+                    }
+                }
+            }
+        }
+        const img = this.ensureDnaSprite();
+        if (!img) return;
+        const zoom = this.viewZoom || 1;
+        const halfW = this.canvasWidth / (2 * zoom) + rad;
+        const halfH = this.canvasHeight / (2 * zoom) + rad;
+        const prevSmooth = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = true;
+        const side = rad * 2;
+        for (let i = 0; i < list.length; i++) {
+            const pellet = list[i];
+            if (Math.abs(pellet.x - this.nodeX) > halfW || Math.abs(pellet.y - this.nodeY) > halfH) continue;
+            ctx.drawImage(img, pellet.x - rad, pellet.y - rad, side, side);
+        }
+        ctx.imageSmoothingEnabled = prevSmooth;
     }
     drawGrid() {
     // 1. Заливаем фон полностью (это не зависит от zoom/translate)
@@ -7815,6 +7944,7 @@ class Cell {
 const game = new Game();
 window.game = game;
 function startGame() {
+    game.syncDnaWallet();
     game.gameLoop();
     ensureCanvasFont().then(() => invalidateCanvasTextCaches());
 }
@@ -8084,7 +8214,7 @@ if (document.readyState === "loading") {
                     <div class="user-container">
                         <img class="user-picture" src="./img/profilepic_guest.png" alt="">
                         <div id="dnaWallet" class="currency-container">
-                            <span class="label">0</span>
+                            <span class="label" id="dnaEatenCount">0</span>
                             <span class="icon sprite-main dna-small-icon"></span>
                             <div class="plus"><span>+</span></div>
                         </div>
