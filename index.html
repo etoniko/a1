@@ -4545,6 +4545,161 @@ function syncGamemodeUI(urlOrKey) {
     if (join) join.classList.toggle("is-in", key === "tournament");
 }
 
+(function () {
+    var blobUrls = new Map();
+    var inflight = new Map();
+    var idbPromise = null;
+    var cachePromise = null;
+    function resolveUrl(url) {
+        try { return new URL(url, location.href).href; } catch (e) { return String(url || ""); }
+    }
+    function openCache() {
+        if (cachePromise) return cachePromise;
+        try {
+            cachePromise = (typeof caches !== "undefined" && caches && caches.open)
+                ? caches.open("agarsu-img-v1").catch(function () { return null; })
+                : Promise.resolve(null);
+        } catch (e) {
+            cachePromise = Promise.resolve(null);
+        }
+        return cachePromise;
+    }
+    function openDb() {
+        if (idbPromise) return idbPromise;
+        idbPromise = new Promise(function (resolve) {
+            try {
+                if (typeof indexedDB === "undefined") { resolve(null); return; }
+                var req = indexedDB.open("agarsu-img", 1);
+                req.onupgradeneeded = function () {
+                    var db = req.result;
+                    if (!db.objectStoreNames.contains("blobs")) db.createObjectStore("blobs");
+                };
+                req.onsuccess = function () { resolve(req.result); };
+                req.onerror = function () { resolve(null); };
+            } catch (e) { resolve(null); }
+        });
+        return idbPromise;
+    }
+    function idbGet(key) {
+        return openDb().then(function (db) {
+            if (!db) return null;
+            return new Promise(function (resolve) {
+                try {
+                    var tx = db.transaction("blobs", "readonly");
+                    var req = tx.objectStore("blobs").get(key);
+                    req.onsuccess = function () {
+                        var row = req.result;
+                        var blob = row && row.blob instanceof Blob ? row.blob : null;
+                        resolve(blob && blob.size ? blob : null);
+                    };
+                    req.onerror = function () { resolve(null); };
+                } catch (e) { resolve(null); }
+            });
+        });
+    }
+    function idbPut(key, blob) {
+        return openDb().then(function (db) {
+            if (!db || !blob || !blob.size) return false;
+            return new Promise(function (resolve) {
+                try {
+                    var tx = db.transaction("blobs", "readwrite");
+                    tx.objectStore("blobs").put({ blob: blob, at: Date.now() }, key);
+                    tx.oncomplete = function () { resolve(true); };
+                    tx.onerror = function () { resolve(false); };
+                    tx.onabort = function () { resolve(false); };
+                } catch (e) { resolve(false); }
+            });
+        });
+    }
+    function blobUrl(key, blob) {
+        var prev = blobUrls.get(key);
+        if (prev) return prev;
+        var url = URL.createObjectURL(blob);
+        blobUrls.set(key, url);
+        return url;
+    }
+    function loadImage(url) {
+        var key = resolveUrl(url);
+        if (!/^https?:/i.test(key)) return Promise.resolve(key);
+        var ready = blobUrls.get(key);
+        if (ready) return Promise.resolve(ready);
+        var pending = inflight.get(key);
+        if (pending) return pending;
+        var job = (async function () {
+            var stored = await idbGet(key);
+            if (stored) return blobUrl(key, stored);
+            try {
+                var store = await openCache();
+                if (store) {
+                    var cached = await store.match(key, { ignoreVary: true, ignoreSearch: true });
+                    if (cached) {
+                        var fromCache = await cached.blob().catch(function () { return null; });
+                        if (fromCache && fromCache.size) {
+                            idbPut(key, fromCache);
+                            return blobUrl(key, fromCache);
+                        }
+                        store.delete(key).catch(function () {});
+                    }
+                }
+            } catch (e) {}
+            var res = await fetch(key);
+            if (!res.ok) throw new Error("image fetch " + res.status);
+            var copy = res.clone();
+            var blob = await res.blob();
+            if (!blob || !blob.size) throw new Error("empty image");
+            var saved = await idbPut(key, blob);
+            if (!saved) {
+                openCache().then(function (store) {
+                    if (!store) return;
+                    try {
+                        var headers = new Headers(copy.headers);
+                        headers.delete("set-cookie");
+                        headers.delete("set-cookie2");
+                        headers.delete("vary");
+                        store.put(key, new Response(copy.body, {
+                            status: copy.status,
+                            statusText: copy.statusText,
+                            headers: headers
+                        })).catch(function () {});
+                    } catch (e) {}
+                }).catch(function () {});
+            }
+            return blobUrl(key, blob);
+        })();
+        inflight.set(key, job);
+        job.finally(function () {
+            if (inflight.get(key) === job) inflight.delete(key);
+        });
+        return job;
+    }
+    window.agarsuLoadImage = loadImage;
+    window.agarsuApplyImg = function (img, url) {
+        if (!img || !url) return;
+        var key = resolveUrl(url);
+        if (img.dataset && img.dataset.agarsuSrc === key && img.complete && img.naturalWidth) return;
+        if (img.dataset) img.dataset.agarsuSrc = key;
+        loadImage(key).then(function (src) {
+            if (img.dataset && img.dataset.agarsuSrc !== key) return;
+            if (img.src !== src) img.src = src;
+        }).catch(function () {});
+    };
+    window.agarsuApplyBg = function (el, url) {
+        if (!el) return;
+        if (!url) {
+            el.style.backgroundImage = "";
+            if (el.dataset) el.dataset.agarsuSrc = "";
+            return;
+        }
+        var key = resolveUrl(url);
+        if (el.dataset && el.dataset.agarsuSrc === key && el.style.backgroundImage) return;
+        if (el.dataset) el.dataset.agarsuSrc = key;
+        loadImage(key).then(function (src) {
+            if (el.dataset && el.dataset.agarsuSrc !== key) return;
+            el.style.backgroundImage = 'url("' + src + '")';
+        }).catch(function () {});
+    };
+})();
+
 class Vector2 {
     constructor(x, y) {
         this.x = x;
@@ -4671,8 +4826,8 @@ class Game {
         this.ejectPressed = false;
         this.splitIcon = new Image();
         this.ejectIcon = new Image();
-        this.splitIcon.src = "https://agar.su/photo/split.png";
-        this.ejectIcon.src = "https://agar.su/photo/eject.png";
+        window.agarsuApplyImg(this.splitIcon, "https://agar.su/photo/split.png");
+        window.agarsuApplyImg(this.ejectIcon, "https://agar.su/photo/eject.png");
         this.timestamp = 0;
         // Управление
         this.isTyping = false;
@@ -4783,7 +4938,7 @@ getSkinForNick(nick) {
     if (this.skinLoading[code]) return null;
 
     const img = new Image();
-    img.src = "https://api.agar.su/skins/" + code + ".png";
+    const skinUrl = "https://api.agar.su/skins/" + code + ".png";
 
     this.skinLoading[code] = true;
 
@@ -4795,6 +4950,11 @@ getSkinForNick(nick) {
     img.onerror = () => {
         delete this.skinLoading[code];
     };
+    window.agarsuLoadImage(skinUrl).then((src) => {
+        img.src = src;
+    }).catch(() => {
+        delete this.skinLoading[code];
+    });
 
     return null;
 }
@@ -4827,7 +4987,6 @@ getSkinForNick(nick) {
         if (this.stickerCache[url]) return this.stickerCache[url];
         if (this.stickerLoading[url]) return null;
         const img = new Image();
-        img.src = url;
         this.stickerLoading[url] = true;
         img.onload = () => {
             if (img.width > 0) this.stickerCache[url] = img;
@@ -4836,6 +4995,11 @@ getSkinForNick(nick) {
         img.onerror = () => {
             delete this.stickerLoading[url];
         };
+        window.agarsuLoadImage(url).then((src) => {
+            img.src = src;
+        }).catch(() => {
+            delete this.stickerLoading[url];
+        });
         return null;
     }
     setNodeSticker(node, stickerId) {
@@ -5918,7 +6082,7 @@ setSpect() {
         if (code === "agar") {
             if (!this.agarFavicon) {
                 this.agarFavicon = new Image();
-                this.agarFavicon.src = "https://агарио.рф/favicon.png";
+                window.agarsuApplyImg(this.agarFavicon, "https://агарио.рф/favicon.png");
             }
             if (this.agarFavicon.complete && this.agarFavicon.naturalWidth) {
                 ctx.drawImage(this.agarFavicon, 0, 0, 14, 14);
@@ -9417,15 +9581,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const menu = document.querySelector(".user-picture");
         const cab = document.getElementById("cabAuthAvatar");
         if (!getAccountToken()) {
-            if (menu) menu.src = GUEST_AVATAR;
-            if (cab) cab.src = CAB_AVATAR;
+            if (menu) window.agarsuApplyImg(menu, GUEST_AVATAR);
+            if (cab) window.agarsuApplyImg(cab, CAB_AVATAR);
             return;
         }
         await ensureSkinMap().catch(() => {});
         const nick = firstLkNick();
         const skin = (nick && skinUrlForNick(nick)) || "";
-        if (menu) menu.src = skin || GUEST_AVATAR;
-        if (cab) cab.src = skin || CAB_AVATAR;
+        if (menu) window.agarsuApplyImg(menu, skin || GUEST_AVATAR);
+        if (cab) window.agarsuApplyImg(cab, skin || CAB_AVATAR);
     }
 
     function currentNick() {
@@ -9442,20 +9606,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const nick = nickInput ? nickInput.value.trim() : "";
         const code = nick ? await resolveSkinCode(nick) : null;
         if (code) {
-            wrap.style.backgroundImage = "url('" + skinUrl(code) + "')";
+            window.agarsuApplyBg(wrap, skinUrl(code));
             btn.classList.add("has-skin");
         } else {
-            wrap.style.backgroundImage = "";
+            window.agarsuApplyBg(wrap, "");
             btn.classList.remove("has-skin");
         }
         if (el.avatar) {
-            if (state.accountAvatar) {
-                el.avatar.style.backgroundImage = "url('" + state.accountAvatar.replace(/'/g, "%27") + "')";
-            } else if (code) {
-                el.avatar.style.backgroundImage = "url('" + skinUrl(code) + "')";
-            } else {
-                el.avatar.style.backgroundImage = "";
-            }
+            if (state.accountAvatar) window.agarsuApplyBg(el.avatar, state.accountAvatar);
+            else if (code) window.agarsuApplyBg(el.avatar, skinUrl(code));
+            else window.agarsuApplyBg(el.avatar, "");
         }
     }
 
@@ -9485,9 +9645,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const uname = $(".user-name");
         if (uname) uname.textContent = getAccountToken() && state.uid != null ? ("ID " + state.uid) : "Гость";
         if (el.nick) el.nick.textContent = displayName;
-        if (el.avatar && state.accountAvatar) {
-            el.avatar.style.backgroundImage = "url('" + state.accountAvatar.replace(/'/g, "%27") + "')";
-        }
+        if (el.avatar && state.accountAvatar) window.agarsuApplyBg(el.avatar, state.accountAvatar);
         updateAuthUi();
         const previewKey = displayName + "|" + (state.accountAvatar || "");
         if (state._previewKey !== previewKey) {
@@ -9679,13 +9837,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!/^https?:\/\//i.test(av)) av = SKIN_FALLBACK;
             return '<li class="' + tone + '">' +
                 '<div class="cab-rating-pos">' + escapeHtml(String(pos)) + "</div>" +
-                '<div class="cab-rating-av" style="background-image:url(\'' + av.replace(/'/g, "%27") + "')\"></div>" +
+                '<div class="cab-rating-av" data-photo="' + escapeHtml(av) + '"></div>' +
                 '<div class="cab-rating-meta">' +
                 '<div class="cab-rating-id">ID ' + escapeHtml(String(uid)) + "</div>" +
                 "</div>" +
                 '<div class="cab-rating-lvl">' + lvl + "</div>" +
                 "</li>";
         }).join("");
+        el.ratingList.querySelectorAll("[data-photo]").forEach((node) => {
+            window.agarsuApplyBg(node, node.getAttribute("data-photo"));
+        });
     }
 
     async function renderSkins() {
@@ -9711,9 +9872,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const sel = state.selectedSkin && String(state.selectedSkin) === String(s.code) ? " is-selected" : "";
             return '<button type="button" class="cabinet-skin' + sel + '" data-nick="' +
                 escapeHtml(s.nick) + '" data-code="' + escapeHtml(s.code) +
-                '" style="background-image:url(\'' + skinUrl(s.code).replace(/'/g, "%27") + '\')" title="' +
+                '" data-photo="' + escapeHtml(skinUrl(s.code)) + '" title="' +
                 escapeHtml(s.nick) + '"><span class="tag">' + escapeHtml(s.nick) + "</span></button>";
         }).join("");
+        el.skinsGrid.querySelectorAll("[data-photo]").forEach((node) => {
+            window.agarsuApplyBg(node, node.getAttribute("data-photo"));
+        });
     }
 
     function openShopForNick(nickPart, isClan, opts) {
@@ -9781,8 +9945,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const img = document.createElement("img");
             img.className = "skin";
             img.loading = "lazy";
-            img.src = url;
             img.alt = "";
+            window.agarsuApplyImg(img, url);
             li.appendChild(img);
         } else {
             const av = document.createElement("div");
