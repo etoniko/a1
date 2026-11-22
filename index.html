@@ -3,6 +3,157 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script>
+    (function () {
+      var CACHE = "agarsu-static-v1";
+      var mem = new Map();
+      var STATIC = /\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|css)(?:$|[?#])/i;
+      function absUrl(url, base) {
+        return new URL(url, base || location.href).href;
+      }
+      function shouldCache(url, base) {
+        try {
+          var u = new URL(url, base || location.href);
+          if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+          if (u.hostname === "api.agar.su") return false;
+          var hostOk = u.hostname === location.hostname || u.hostname === "agar.su" || u.hostname === "www.agar.su" || u.hostname === "xn--80aaiv4ak.xn--p1ai" || u.hostname === "www.xn--80aaiv4ak.xn--p1ai";
+          return hostOk && STATIC.test(u.pathname);
+        } catch (e) {
+          return false;
+        }
+      }
+      function loadStatic(url, base) {
+        var abs = absUrl(url, base);
+        if (mem.has(abs)) return mem.get(abs);
+        var job = (window.caches && caches.open ? caches.open(CACHE) : Promise.resolve(null)).then(function (cache) {
+          var fromNet = function () {
+            return fetch(abs).then(function (res) {
+              if (!res.ok) throw new Error("static " + res.status);
+              var copy = res.clone();
+              return res.blob().then(function (blob) {
+                if (!blob || !blob.size) throw new Error("empty");
+                if (cache) cache.put(abs, copy).catch(function () {});
+                return URL.createObjectURL(blob);
+              });
+            });
+          };
+          if (!cache) return fromNet();
+          return cache.match(abs).then(function (hit) {
+            if (!hit) return fromNet();
+            return hit.blob().then(function (blob) {
+              if (!blob || !blob.size) return fromNet();
+              return URL.createObjectURL(blob);
+            });
+          }).catch(fromNet);
+        });
+        mem.set(abs, job);
+        job.catch(function () { if (mem.get(abs) === job) mem.delete(abs); });
+        return job;
+      }
+      function rewriteCss(css, base) {
+        var re = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
+        var found = [];
+        var m;
+        while ((m = re.exec(css))) {
+          var raw = m[2].trim();
+          if (/^(data:|blob:)/i.test(raw) || !shouldCache(raw, base) || found.indexOf(raw) !== -1) continue;
+          found.push(raw);
+        }
+        return Promise.all(found.map(function (raw) {
+          return loadStatic(raw, base).then(function (blob) { return [raw, blob]; }).catch(function () { return null; });
+        })).then(function (pairs) {
+          var out = css;
+          pairs.forEach(function (pair) {
+            if (!pair) return;
+            var escaped = pair[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            out = out.replace(new RegExp("url\\(\\s*(['\"]?)" + escaped + "\\1\\s*\\)", "g"), "url('" + pair[1] + "')");
+          });
+          return out;
+        });
+      }
+      function paint(el) {
+        var raw = el.getAttribute("data-static-src");
+        if (!raw || el.getAttribute("data-static-done") === raw) return;
+        el.setAttribute("data-static-done", raw);
+        loadStatic(raw).then(function (blob) {
+          if (el.getAttribute("data-static-done") !== raw) return;
+          var tag = el.tagName;
+          if (tag === "IMG" || tag === "SOURCE" || tag === "VIDEO" || tag === "AUDIO" || tag === "SCRIPT") el.src = blob;
+          else if (tag === "LINK") el.href = blob;
+          else el.style.backgroundImage = 'url("' + blob + '")';
+        }).catch(function () {
+          var tag = el.tagName;
+          if (tag === "IMG" || tag === "SOURCE") el.src = raw;
+          else if (tag === "LINK") el.href = raw;
+        });
+      }
+      function hydrate(root) {
+        if (!root || root.nodeType !== 1) return;
+        if (root.hasAttribute && root.hasAttribute("data-static-src")) paint(root);
+        if (root.querySelectorAll) root.querySelectorAll("[data-static-src]").forEach(paint);
+      }
+      window.agarsuStaticUrl = function (url, base) { return loadStatic(url, base); };
+      window.agarsuBootStyles = function () {
+        var css = document.getElementById("site-css");
+        if (css) {
+          rewriteCss(css.textContent, location.href).then(function (text) {
+            css.textContent = text;
+            css.disabled = false;
+          }).catch(function () { css.disabled = false; });
+        }
+        hydrate(document.documentElement);
+        var fonts = document.getElementById("site-fonts");
+        if (!fonts) return;
+        var href = fonts.getAttribute("data-href");
+        if (!href) return;
+        var base = absUrl(href);
+        loadStatic(href).then(function (blobUrl) {
+          return fetch(blobUrl).then(function (res) { return res.text(); });
+        }).then(function (text) {
+          return rewriteCss(text, base);
+        }).then(function (text) {
+          var style = document.createElement("style");
+          style.textContent = text;
+          fonts.replaceWith(style);
+        }).catch(function () {});
+        hydrate(document.documentElement);
+      };
+      new MutationObserver(function (list) {
+        list.forEach(function (rec) {
+          rec.addedNodes.forEach(function (node) { hydrate(node); });
+        });
+      }).observe(document.documentElement, { childList: true, subtree: true });
+      var imgSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+      if (imgSrc && imgSrc.set) {
+        Object.defineProperty(HTMLImageElement.prototype, "src", {
+          configurable: true,
+          enumerable: true,
+          get: function () { return imgSrc.get.call(this); },
+          set: function (value) {
+            var img = this;
+            if (!shouldCache(value)) { imgSrc.set.call(img, value); return; }
+            loadStatic(value).then(function (blob) { imgSrc.set.call(img, blob); }).catch(function () { imgSrc.set.call(img, value); });
+          }
+        });
+      }
+      var bg = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, "backgroundImage");
+      if (bg && bg.set) {
+        Object.defineProperty(CSSStyleDeclaration.prototype, "backgroundImage", {
+          configurable: true,
+          enumerable: true,
+          get: function () { return bg.get.call(this); },
+          set: function (value) {
+            var decl = this;
+            var match = String(value || "").match(/url\(\s*(['"]?)([^'")]+)\1\s*\)/);
+            if (!match || !shouldCache(match[2])) { bg.set.call(decl, value); return; }
+            loadStatic(match[2]).then(function (blob) {
+              bg.set.call(decl, String(value).replace(match[2], blob));
+            }).catch(function () { bg.set.call(decl, value); });
+          }
+        });
+      }
+    })();
+    </script>
     
     <!-- Основной SEO -->
     <title>Агарио</title>
@@ -49,10 +200,8 @@
     <!-- Permissions Policy (как было) -->
     <meta http-equiv="Permissions-Policy" content="microphone=(), camera=(), geolocation=(), display-capture=(), window-management=(), local-fonts=(), serial=(), usb=(), hid=(), bluetooth=()">  
     <!-- Шрифт -->
-    <link rel="preload" href="./fonts/Ubuntu-Bold.ttf" as="font" type="font/ttf" crossorigin>
-    
     <!-- Стили и скрипты -->
-    <style>
+    <style id="site-css" disabled>
 
 /* === mainui === */
 #mainui-app {
@@ -4102,6 +4251,7 @@ header#mainui-header.hidden {
     background-repeat: no-repeat;
 }
 </style>
+    <script>if (window.agarsuBootStyles) window.agarsuBootStyles();</script>
     <script>
 /**
  * Simple keyword antimat for a1.
@@ -7989,8 +8139,8 @@ if (document.readyState === "loading") {
 }
 </script>
     <!-- Favicon -->
-    <link id="favicon" rel="icon" type="image/png" href="favicon.png">
-    <link rel="apple-touch-icon" href="favicon.png">
+    <link id="favicon" rel="icon" type="image/png" data-static-src="favicon.png">
+    <link rel="apple-touch-icon" data-static-src="favicon.png">
     
     <!-- Yandex.RTB -->
     <script>window.yaContextCb = window.yaContextCb || [];</script>
@@ -8246,7 +8396,7 @@ if (document.readyState === "loading") {
             <div>
                 <div id="mainui-user">
                     <div class="user-container">
-                        <img class="user-picture" src="./img/profilepic_guest.png" alt="">
+                        <img class="user-picture" data-static-src="./img/profilepic_guest.png" alt="">
                         <div id="dnaWallet" class="currency-container">
                             <span class="label">0</span>
                             <span class="icon sprite-main dna-small-icon"></span>
@@ -8414,7 +8564,7 @@ if (document.readyState === "loading") {
                         <div class="agario-promo-container">
                             <div class="agario-promo">
                                 <a class="promo-spot" href="https://www.youtube.com/watch?v=LwQXVxXISas" target="_blank" rel="noopener">
-                                    <img src="./img/morcov.gif" alt="" onerror="this.style.display='none'">
+                                    <img data-static-src="./img/morcov.gif" alt="" onerror="this.style.display='none'">
                                     <div class="promo-spot-copy">
                                         <b>Сними видео — попади сюда</b>
                                         <span>Опубликуй в YouTube, TikTok или VK и пришли ссылку на нашу почту ikometai@ya.ru. Лучшие ролики появятся здесь.</span>
